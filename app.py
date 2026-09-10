@@ -1,132 +1,118 @@
+
+import hashlib
 import json
 import os
+from datetime import date
 
 import pandas as pd
 import streamlit as st
-
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+from parsers.json_parser import flatten_json
 
-# ==========================================
-# 1. 读取环境变量
-# ==========================================
 
+# =========================
+# Environment
+# =========================
 load_dotenv()
 
 api_key = os.getenv("ANTHROPIC_API_KEY")
 workspace_id = os.getenv("ANTHROPIC_WORKSPACE_ID")
-model_name = os.getenv(
-    "CLAUDE_MODEL",
-    "claude-sonnet-5",
-)
+model_name = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 
 
-# ==========================================
-# 2. Claude Mapping 数据结构
-# ==========================================
+# =========================
+# Claude structured output
+# =========================
+class InterfaceInfoAI(BaseModel):
+    creation_date: str
+    author: str
+    interface_id: str
+    interface_name: str
+    interface_pattern: str
+    schedule_driven: str
+    execution_cycle: str
+    max_records: str
+    average_records: str
+    split_count: str
 
-class MappingItem(BaseModel):
+
+class TransmissionAI(BaseModel):
+    contact_name: str
+    department: str
+    contact: str
+    integration_technology: str
+    server: str
+    database: str
+    adapter: str
+    processing_pattern: str
+
+
+class MappingItemAI(BaseModel):
     source_path: str
     source_field: str
+    source_system: str
+    source_table: str
+    source_pk: str
+    source_type: str
+    source_size: str
+    source_description: str
+    source_remark: str
 
     target_path: str
     target_field: str
+    target_system: str
+    target_table: str
+    target_pk: str
+    target_type: str
+    target_size: str
+    target_description: str
+    target_remark: str
 
     confidence: int
     reason: str
 
 
-class MappingResult(BaseModel):
-    mappings: list[MappingItem]
+class ReturnValueAI(BaseModel):
+    source_system: str
+    source_table: str
+    source_pk: str
+    source_field: str
+    source_type: str
+    source_size: str
+    source_description: str
+    source_remark: str
+
+    target_system: str
+    target_table: str
+    target_pk: str
+    target_field: str
+    target_type: str
+    target_size: str
+    target_description: str
+    target_remark: str
 
 
-# ==========================================
-# 3. JSON 字段解析函数
-# ==========================================
-
-def flatten_json(data, parent_path=""):
-    fields = []
-
-    if isinstance(data, dict):
-
-        for key, value in data.items():
-
-            if parent_path:
-                path = f"{parent_path}.{key}"
-            else:
-                path = key
-
-            # ------------------------------
-            # 嵌套 Object
-            # ------------------------------
-            if isinstance(value, dict):
-
-                fields.extend(
-                    flatten_json(
-                        value,
-                        path,
-                    )
-                )
-
-            # ------------------------------
-            # Array
-            # ------------------------------
-            elif isinstance(value, list):
-
-                if (
-                    len(value) > 0
-                    and isinstance(value[0], dict)
-                ):
-
-                    fields.extend(
-                        flatten_json(
-                            value[0],
-                            path + "[]",
-                        )
-                    )
-
-                else:
-
-                    fields.append(
-                        {
-                            "Path": path,
-                            "Field": key,
-                            "Type": "array",
-                            "Sample": str(value),
-                        }
-                    )
-
-            # ------------------------------
-            # 普通字段
-            # ------------------------------
-            else:
-
-                fields.append(
-                    {
-                        "Path": path,
-                        "Field": key,
-                        "Type": type(value).__name__,
-                        "Sample": (
-                            ""
-                            if value is None
-                            else str(value)
-                        ),
-                    }
-                )
-
-    return fields
+class AnalysisResult(BaseModel):
+    interface_information: InterfaceInfoAI
+    source_transmission: TransmissionAI
+    target_transmission: TransmissionAI
+    mappings: list[MappingItemAI]
+    return_values: list[ReturnValueAI]
 
 
-# ==========================================
-# 4. 根据 Interface Type
-#    决定允许上传的文件格式
-# ==========================================
+# =========================
+# File helpers
+# =========================
+def read_json_file(uploaded_file):
+    raw = uploaded_file.getvalue().decode("utf-8-sig")
+    return json.loads(raw)
+
 
 def get_allowed_file_types(interface_type):
-
-    file_type_map = {
+    return {
         "JSON": ["json"],
         "PDF": ["pdf"],
         "Swagger": ["json", "yaml", "yml"],
@@ -134,15 +120,179 @@ def get_allowed_file_types(interface_type):
         "Open API": ["json", "yaml", "yml"],
         "SOAP": ["xml", "wsdl", "xsd"],
         "Other": None,
-    }
-
-    return file_type_map.get(interface_type)
+    }.get(interface_type)
 
 
-# ==========================================
-# 5. Streamlit 页面设置
-# ==========================================
+# =========================
+# Front-end column definitions
+# =========================
+INTERFACE_INFO_COLUMNS = [
+    "생성일 / Creation Date",
+    "작성자 / Author",
+    "인터페이스 ID / Interface ID",
+    "인터페이스 명 / Interface Name",
+    "인터페이스 패턴 / Interface Pattern",
+    "스케줄 구동 / Schedule Driven",
+    "실행 주기 / Execution Cycle",
+    "최대 레코드(건) / Max Records",
+    "평균 레코드(건) / Average Records",
+    "분할 건수 / Split Count",
+]
 
+SOURCE_TRANSMISSION_COLUMNS = [
+    "담당자 명 / Contact Name",
+    "담당자 소속 / Department",
+    "담당자 연락처 / Contact",
+    "연계 기술 / Integration Technology",
+    "Source Svr / Source Server",
+    "DB / Database",
+    "ADAPTER / Adapter",
+    "조회 패턴 / Query Pattern",
+]
+
+TARGET_TRANSMISSION_COLUMNS = [
+    "담당자 명 / Contact Name",
+    "담당자 소속 / Department",
+    "담당자 연락처 / Contact",
+    "연계 기술 / Integration Technology",
+    "Target Svr / Target Server",
+    "DB / Database",
+    "ADAPTER / Adapter",
+    "처리 패턴 / Processing Pattern",
+]
+
+MAPPING_COLUMNS = [
+    "송신 시스템 / Source System",
+    "순번 / Seq.",
+    "송신 테이블 / Source Table",
+    "송신 PK / Source PK",
+    "송신 경로 / Source Path",
+    "송신 필드명 / Source Field",
+    "송신 타입 / Source Type",
+    "송신 사이즈 / Source Size",
+    "송신 설명 / Source Description",
+    "송신 비고 / Source Remark",
+    "Mapping / Mapping",
+    "AI 추천 대상 경로 / AI Suggested Target Path",
+    "AI 추천 대상 필드 / AI Suggested Target Field",
+    "최종 대상 경로 / Final Target Path",
+    "최종 대상 필드 / Final Target Field",
+    "수신 시스템 / Target System",
+    "수신 테이블 / Target Table",
+    "수신 PK / Target PK",
+    "수신 타입 / Target Type",
+    "수신 사이즈 / Target Size",
+    "수신 설명 / Target Description",
+    "수신 비고 / Target Remark",
+    "AI 대상 존재 여부 / AI Target Exists",
+    "매핑 상태 / Mapping Status",
+    "신뢰도 / Confidence",
+    "AI 판단 근거 / AI Reason",
+]
+
+RETURN_VALUE_COLUMNS = [
+    "송신 시스템 / Source System",
+    "순번 / Seq.",
+    "송신 테이블 / Source Table",
+    "송신 PK / Source PK",
+    "송신 필드명 / Source Field",
+    "송신 타입 / Source Type",
+    "송신 사이즈 / Source Size",
+    "송신 설명 / Source Description",
+    "송신 비고 / Source Remark",
+    "Mapping / Mapping",
+    "수신 시스템 / Target System",
+    "수신 테이블 / Target Table",
+    "수신 PK / Target PK",
+    "수신 필드명 / Target Field",
+    "수신 타입 / Target Type",
+    "수신 사이즈 / Target Size",
+    "수신 설명 / Target Description",
+    "수신 비고 / Target Remark",
+]
+
+
+# =========================
+# DataFrame builders
+# =========================
+def one_row_df(columns, initial=None):
+    row = {column: "" for column in columns}
+    if initial:
+        row.update(initial)
+    return pd.DataFrame([row], columns=columns)
+
+
+def build_interface_info_df():
+    return one_row_df(
+        INTERFACE_INFO_COLUMNS,
+        {"생성일 / Creation Date": date.today().strftime("%Y.%m.%d")},
+    )
+
+
+def build_mapping_df(source_fields=None):
+    rows = []
+
+    if source_fields:
+        for seq, field in enumerate(source_fields, start=1):
+            row = {column: "" for column in MAPPING_COLUMNS}
+            row["순번 / Seq."] = seq
+            row["송신 경로 / Source Path"] = field["Path"]
+            row["송신 필드명 / Source Field"] = field["Field"]
+            row["송신 타입 / Source Type"] = field["Type"]
+            row["Mapping / Mapping"] = "->"
+            row["매핑 상태 / Mapping Status"] = "Pending"
+            rows.append(row)
+
+    if not rows:
+        row = {column: "" for column in MAPPING_COLUMNS}
+        row["순번 / Seq."] = 1
+        row["Mapping / Mapping"] = "->"
+        row["매핑 상태 / Mapping Status"] = "Pending"
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=MAPPING_COLUMNS)
+
+
+def build_return_df():
+    return one_row_df(
+        RETURN_VALUE_COLUMNS,
+        {
+            "순번 / Seq.": 1,
+            "Mapping / Mapping": "<-",
+        },
+    )
+
+
+def reset_data(source_fields=None):
+    st.session_state["interface_info_df"] = build_interface_info_df()
+    st.session_state["source_transmission_df"] = one_row_df(
+        SOURCE_TRANSMISSION_COLUMNS
+    )
+    st.session_state["target_transmission_df"] = one_row_df(
+        TARGET_TRANSMISSION_COLUMNS
+    )
+    st.session_state["mapping_df"] = build_mapping_df(source_fields)
+    st.session_state["return_value_df"] = build_return_df()
+    st.session_state["editor_version"] = (
+        st.session_state.get("editor_version", 0) + 1
+    )
+
+
+def merge_first_row(df, values):
+    result = df.copy()
+    for column, value in values.items():
+        if (
+            column in result.columns
+            and value is not None
+            and str(value).strip() != ""
+        ):
+            result.at[0, column] = value
+    return result
+
+
+# =========================
+# Page
+# =========================
 st.set_page_config(
     page_title="Interface Mapping Assistant",
     page_icon="🔗",
@@ -150,15 +300,7 @@ st.set_page_config(
 )
 
 st.title("🔗 Interface Mapping Assistant")
-
-st.caption(
-    "AI-powered interface field mapping assistant"
-)
-
-
-# ==========================================
-# 6. Interface Type
-# ==========================================
+st.caption("AI-powered interface field mapping assistant")
 
 interface_types = [
     "JSON",
@@ -171,428 +313,488 @@ interface_types = [
 ]
 
 
-# ==========================================
-# 7. Source / Target Interface 上传
-# ==========================================
+# =========================
+# Upload area
+# =========================
+left, right = st.columns(2)
 
-col1, col2 = st.columns(2)
-
-
-with col1:
-
-    st.subheader(
-        "Source Interface"
-    )
-
+with left:
+    st.subheader("Source Interface")
     source_interface_type = st.selectbox(
-        "Interface Type",
+        "인터페이스 형식 / Interface Type",
         interface_types,
         key="source_interface_type",
     )
-
     source_file = st.file_uploader(
-        "Upload Source Interface",
-        type=get_allowed_file_types(
-            source_interface_type
-        ),
+        "송신 인터페이스 업로드 / Upload Source Interface",
+        type=get_allowed_file_types(source_interface_type),
         key="source_interface",
     )
 
-
-with col2:
-
-    st.subheader(
-        "Target Interface"
-    )
-
+with right:
+    st.subheader("Target Interface")
     target_interface_type = st.selectbox(
-        "Interface Type",
+        "인터페이스 형식 / Interface Type",
         interface_types,
         key="target_interface_type",
     )
-
     target_file = st.file_uploader(
-        "Upload Target Interface",
-        type=get_allowed_file_types(
-            target_interface_type
-        ),
+        "수신 인터페이스 업로드 / Upload Target Interface",
+        type=get_allowed_file_types(target_interface_type),
         key="target_interface",
     )
 
 
-# ==========================================
-# 8. Source / Target 初始化
-# ==========================================
-
+# =========================
+# Parse files
+# =========================
 source_fields = None
 target_fields = None
 
-
-# ==========================================
-# 9. Source Interface 解析
-# ==========================================
-
 if source_file is not None:
-
     if source_interface_type == "JSON":
-
         try:
-
-            source_data = json.load(
-                source_file
-            )
-
-            source_fields = flatten_json(
-                source_data
-            )
-
-            st.subheader(
-                "Source Interface Fields"
-            )
-
-            st.dataframe(
-                source_fields,
-                use_container_width=True,
-            )
-
+            source_fields = flatten_json(read_json_file(source_file))
         except Exception as e:
-
-            st.error(
-                f"Source JSON 读取失败：{e}"
-            )
-
+            st.error(f"Source JSON 读取失败：{e}")
     else:
-
         st.info(
-            f"{source_interface_type} "
-            "解析功能暂未开发，"
-            "当前版本仅支持 JSON 字段解析。"
+            f"Source：{source_interface_type} 解析功能暂未开发。"
         )
-
-
-# ==========================================
-# 10. Target Interface 解析
-# ==========================================
 
 if target_file is not None:
-
     if target_interface_type == "JSON":
-
         try:
-
-            target_data = json.load(
-                target_file
-            )
-
-            target_fields = flatten_json(
-                target_data
-            )
-
-            st.subheader(
-                "Target Interface Fields"
-            )
-
-            st.dataframe(
-                target_fields,
-                use_container_width=True,
-            )
-
+            target_fields = flatten_json(read_json_file(target_file))
         except Exception as e:
-
-            st.error(
-                f"Target JSON 读取失败：{e}"
-            )
-
+            st.error(f"Target JSON 读取失败：{e}")
     else:
-
         st.info(
-            f"{target_interface_type} "
-            "解析功能暂未开发，"
-            "当前版本仅支持 JSON 字段解析。"
+            f"Target：{target_interface_type} 解析功能暂未开发。"
         )
 
 
-# ==========================================
-# 11. Claude AI Mapping
-# ==========================================
+# =========================
+# Clear stale results when files change
+# =========================
+signature_parts = [source_interface_type, target_interface_type]
 
-if (
-    source_fields is not None
-    and target_fields is not None
-):
+for uploaded in [source_file, target_file]:
+    if uploaded is not None:
+        signature_parts.extend([
+            uploaded.name,
+            hashlib.sha256(uploaded.getvalue()).hexdigest(),
+        ])
 
+signature = "|".join(signature_parts)
+
+if st.session_state.get("file_signature") != signature:
+    st.session_state["file_signature"] = signature
+    reset_data(source_fields)
+
+if "interface_info_df" not in st.session_state:
+    reset_data(source_fields)
+
+
+# =========================
+# AI Analysis
+# =========================
+if source_fields is not None and target_fields is not None:
     st.divider()
 
     if st.button(
-        "Generate AI Mapping",
+        "AI 분석 및 Mapping 생성 / Generate AI Analysis & Mapping",
         type="primary",
     ):
-
-        # ------------------------------
-        # 检查 API Key
-        # ------------------------------
-
         if not api_key:
-
-            st.error(
-                "没有找到 ANTHROPIC_API_KEY，"
-                "请检查 .env 文件。"
-            )
-
+            st.error("没有找到 ANTHROPIC_API_KEY。")
             st.stop()
-
-
-        # ------------------------------
-        # 检查 Workspace ID
-        # ------------------------------
 
         if not workspace_id:
-
-            st.error(
-                "没有找到 "
-                "ANTHROPIC_WORKSPACE_ID，"
-                "请检查 .env 文件。"
-            )
-
+            st.error("没有找到 ANTHROPIC_WORKSPACE_ID。")
             st.stop()
-
-
-        # ------------------------------
-        # 创建 Claude Client
-        # ------------------------------
 
         client = Anthropic(
             api_key=api_key,
             default_headers={
-                "anthropic-workspace-id":
-                    workspace_id
+                "anthropic-workspace-id": workspace_id
             },
         )
 
-
-        # ------------------------------
-        # Claude Prompt
-        # ------------------------------
-
         prompt = f"""
-You are an interface field mapping specialist.
+You are an enterprise interface mapping specialist.
 
-Your task is to map every Source Interface field
-to the most appropriate Target Interface field.
+Analyze these interfaces and populate four sections:
+
+1. Interface Information
+2. Transmission Information
+3. Mapping Specification
+4. Return Value
 
 IMPORTANT:
-
-Each field has BOTH:
-
-- Path
-- Field
-
-The Path represents the complete location
-of the field inside the interface structure.
-
-For example:
-
-sender.name
-receiver.name
-
-Both fields may have the same Field name "name",
-but they represent different business meanings.
-
-Therefore:
-
-You MUST use Path together with Field
-when performing mapping.
-
-Analyze:
-
-1. Full field path
-2. Field name
-3. Data type
-4. Sample value
-5. Business meaning
-6. Parent object meaning
-
-Source Interface fields:
-
-{json.dumps(
-    source_fields,
-    ensure_ascii=False,
-    indent=2
-)}
-
-Target Interface fields:
-
-{json.dumps(
-    target_fields,
-    ensure_ascii=False,
-    indent=2
-)}
-
-Rules:
-
+- Never invent unsupported information.
+- If information cannot be determined, return "".
 - Analyze every Source field.
+- Always use full Path + Field together.
+- Duplicate Field names may exist under different Paths.
+- Do not force a mapping.
+- If no valid Target exists, return target_path="" and target_field="".
+- If no explicit return/response fields exist, return return_values=[].
 
-- source_path must exactly match
-  an existing Source Path.
+SOURCE FILE: {source_file.name}
+TARGET FILE: {target_file.name}
 
-- source_field must exactly match
-  the Field associated with source_path.
+SOURCE FIELDS:
+{json.dumps(source_fields, ensure_ascii=False, indent=2)}
 
-- target_path must exactly match
-  an existing Target Path.
+TARGET FIELDS:
+{json.dumps(target_fields, ensure_ascii=False, indent=2)}
 
-- target_field must exactly match
-  the Field associated with target_path.
+Mapping rules:
+- source_path must exactly match an existing Source Path.
+- source_field must match the Field belonging to source_path.
+- target_path must exactly match an existing Target Path,
+  or be "" when Unmapped.
+- target_field must match the Field belonging to target_path,
+  or be "" when Unmapped.
+- confidence must be 0-100.
+- reason must briefly explain the judgment.
 
-- Do not invent fields or paths.
-
-- Always consider the full path,
-  especially when duplicate field names exist.
-
-- confidence must be an integer
-  from 0 to 100.
-
-- Lower confidence when business meaning
-  is uncertain.
-
-- Give a short reason explaining
-  why the Source and Target match.
-
-Return the result using the required
-structured output format.
+For system/table/PK/type/size/description/remark,
+Interface Information, and Transmission Information:
+fill only when supported or reasonably inferable;
+otherwise use "".
 """
 
-
-        # ------------------------------
-        # 调用 Claude
-        # ------------------------------
-
-        with st.spinner(
-            "Claude is analyzing "
-            "the interface fields..."
-        ):
-
+        with st.spinner("Claude is analyzing the interfaces..."):
             try:
-
-                response = (
-                    client.messages.parse(
-                        model=model_name,
-                        max_tokens=7000,
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": prompt,
-                            }
-                        ],
-                        output_format=(
-                            MappingResult
-                        ),
-                    )
+                response = client.messages.parse(
+                    model=model_name,
+                    max_tokens=8000,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    output_format=AnalysisResult,
                 )
-
-                mapping_result = (
-                    response.parsed_output
-                )
-
+                ai = response.parsed_output
             except Exception as e:
-
-                st.error(
-                    f"Claude API 调用失败：{e}"
-                )
-
+                st.error(f"Claude API 调用失败：{e}")
                 st.stop()
 
+        # 1. Interface Information
+        st.session_state["interface_info_df"] = merge_first_row(
+            st.session_state["interface_info_df"],
+            {
+                "생성일 / Creation Date":
+                    ai.interface_information.creation_date,
+                "작성자 / Author":
+                    ai.interface_information.author,
+                "인터페이스 ID / Interface ID":
+                    ai.interface_information.interface_id,
+                "인터페이스 명 / Interface Name":
+                    ai.interface_information.interface_name,
+                "인터페이스 패턴 / Interface Pattern":
+                    ai.interface_information.interface_pattern,
+                "스케줄 구동 / Schedule Driven":
+                    ai.interface_information.schedule_driven,
+                "실행 주기 / Execution Cycle":
+                    ai.interface_information.execution_cycle,
+                "최대 레코드(건) / Max Records":
+                    ai.interface_information.max_records,
+                "평균 레코드(건) / Average Records":
+                    ai.interface_information.average_records,
+                "분할 건수 / Split Count":
+                    ai.interface_information.split_count,
+            },
+        )
 
-        # ==================================
-        # Claude结果转换为表格
-        # ==================================
+        # 2. Transmission Information
+        st.session_state["source_transmission_df"] = merge_first_row(
+            st.session_state["source_transmission_df"],
+            {
+                "담당자 명 / Contact Name":
+                    ai.source_transmission.contact_name,
+                "담당자 소속 / Department":
+                    ai.source_transmission.department,
+                "담당자 연락처 / Contact":
+                    ai.source_transmission.contact,
+                "연계 기술 / Integration Technology":
+                    ai.source_transmission.integration_technology,
+                "Source Svr / Source Server":
+                    ai.source_transmission.server,
+                "DB / Database":
+                    ai.source_transmission.database,
+                "ADAPTER / Adapter":
+                    ai.source_transmission.adapter,
+                "조회 패턴 / Query Pattern":
+                    ai.source_transmission.processing_pattern,
+            },
+        )
+
+        st.session_state["target_transmission_df"] = merge_first_row(
+            st.session_state["target_transmission_df"],
+            {
+                "담당자 명 / Contact Name":
+                    ai.target_transmission.contact_name,
+                "담당자 소속 / Department":
+                    ai.target_transmission.department,
+                "담당자 연락처 / Contact":
+                    ai.target_transmission.contact,
+                "연계 기술 / Integration Technology":
+                    ai.target_transmission.integration_technology,
+                "Target Svr / Target Server":
+                    ai.target_transmission.server,
+                "DB / Database":
+                    ai.target_transmission.database,
+                "ADAPTER / Adapter":
+                    ai.target_transmission.adapter,
+                "처리 패턴 / Processing Pattern":
+                    ai.target_transmission.processing_pattern,
+            },
+        )
+
+        # 3. Mapping Specification
+        target_by_path = {
+            field["Path"]: field for field in target_fields
+        }
+        ai_by_source_path = {
+            item.source_path: item for item in ai.mappings
+        }
 
         mapping_rows = []
 
-        for item in mapping_result.mappings:
+        for seq, source in enumerate(source_fields, start=1):
+            item = ai_by_source_path.get(source["Path"])
+            row = {column: "" for column in MAPPING_COLUMNS}
 
-            mapping_rows.append(
-                {
-                    "Source Path":
-                        item.source_path,
+            row["순번 / Seq."] = seq
+            row["송신 경로 / Source Path"] = source["Path"]
+            row["송신 필드명 / Source Field"] = source["Field"]
+            row["송신 타입 / Source Type"] = source["Type"]
+            row["Mapping / Mapping"] = "->"
 
-                    "Source Field":
-                        item.source_field,
+            if item is None:
+                row["AI 대상 존재 여부 / AI Target Exists"] = "NO"
+                row["매핑 상태 / Mapping Status"] = "Unmapped"
+                mapping_rows.append(row)
+                continue
 
-                    "Target Path":
-                        item.target_path,
+            row["송신 시스템 / Source System"] = item.source_system
+            row["송신 테이블 / Source Table"] = item.source_table
+            row["송신 PK / Source PK"] = item.source_pk
+            row["송신 타입 / Source Type"] = (
+                item.source_type or source["Type"]
+            )
+            row["송신 사이즈 / Source Size"] = item.source_size
+            row["송신 설명 / Source Description"] = (
+                item.source_description
+            )
+            row["송신 비고 / Source Remark"] = item.source_remark
 
-                    "Target Field":
-                        item.target_field,
+            # Keep the raw AI suggestion
+            row[
+                "AI 추천 대상 경로 / AI Suggested Target Path"
+            ] = item.target_path
+            row[
+                "AI 추천 대상 필드 / AI Suggested Target Field"
+            ] = item.target_field
+            row["신뢰도 / Confidence"] = item.confidence
+            row["AI 판단 근거 / AI Reason"] = item.reason
 
-                    "Confidence":
-                        item.confidence,
-
-                    "Reason":
-                        item.reason,
-
-                    "Review Status":
-                        "Pending",
-
-                    "Remark":
-                        "",
-                }
+            # Validate AI Target
+            target_record = (
+                target_by_path.get(item.target_path)
+                if item.target_path
+                else None
             )
 
+            target_exists = (
+                target_record is not None
+                and target_record["Field"] == item.target_field
+            )
 
-        st.session_state[
-            "mapping_df"
-        ] = pd.DataFrame(
-            mapping_rows
+            if target_exists:
+                row["AI 대상 존재 여부 / AI Target Exists"] = "YES"
+                row["최종 대상 경로 / Final Target Path"] = (
+                    item.target_path
+                )
+                row["최종 대상 필드 / Final Target Field"] = (
+                    item.target_field
+                )
+                row["수신 시스템 / Target System"] = item.target_system
+                row["수신 테이블 / Target Table"] = item.target_table
+                row["수신 PK / Target PK"] = item.target_pk
+                row["수신 타입 / Target Type"] = (
+                    item.target_type or target_record["Type"]
+                )
+                row["수신 사이즈 / Target Size"] = item.target_size
+                row["수신 설명 / Target Description"] = (
+                    item.target_description
+                )
+                row["수신 비고 / Target Remark"] = item.target_remark
+                row["매핑 상태 / Mapping Status"] = (
+                    "Mapped"
+                    if item.confidence >= 75
+                    else "Review Required"
+                )
+
+            else:
+                # AI suggestion is preserved, but Final Target stays blank
+                row["AI 대상 존재 여부 / AI Target Exists"] = "NO"
+                row["최종 대상 경로 / Final Target Path"] = ""
+                row["최종 대상 필드 / Final Target Field"] = ""
+                row["매핑 상태 / Mapping Status"] = "Unmapped"
+
+            mapping_rows.append(row)
+
+        st.session_state["mapping_df"] = pd.DataFrame(
+            mapping_rows,
+            columns=MAPPING_COLUMNS,
         )
 
+        # 4. Return Value
+        if ai.return_values:
+            return_rows = []
 
-# ==========================================
-# 12. 可编辑 Mapping Table
-# ==========================================
+            for seq, item in enumerate(ai.return_values, start=1):
+                return_rows.append({
+                    "송신 시스템 / Source System":
+                        item.source_system,
+                    "순번 / Seq.": seq,
+                    "송신 테이블 / Source Table":
+                        item.source_table,
+                    "송신 PK / Source PK":
+                        item.source_pk,
+                    "송신 필드명 / Source Field":
+                        item.source_field,
+                    "송신 타입 / Source Type":
+                        item.source_type,
+                    "송신 사이즈 / Source Size":
+                        item.source_size,
+                    "송신 설명 / Source Description":
+                        item.source_description,
+                    "송신 비고 / Source Remark":
+                        item.source_remark,
+                    "Mapping / Mapping": "<-",
+                    "수신 시스템 / Target System":
+                        item.target_system,
+                    "수신 테이블 / Target Table":
+                        item.target_table,
+                    "수신 PK / Target PK":
+                        item.target_pk,
+                    "수신 필드명 / Target Field":
+                        item.target_field,
+                    "수신 타입 / Target Type":
+                        item.target_type,
+                    "수신 사이즈 / Target Size":
+                        item.target_size,
+                    "수신 설명 / Target Description":
+                        item.target_description,
+                    "수신 비고 / Target Remark":
+                        item.target_remark,
+                })
 
-if "mapping_df" in st.session_state:
+            st.session_state["return_value_df"] = pd.DataFrame(
+                return_rows,
+                columns=RETURN_VALUE_COLUMNS,
+            )
 
-    st.subheader(
-        "Mapping Result"
-    )
+        # Force editors to refresh with AI-filled values
+        st.session_state["editor_version"] += 1
+        st.rerun()
 
-    edited_df = st.data_editor(
-        st.session_state[
-            "mapping_df"
-        ],
+
+# =========================
+# Four front-end sections
+# =========================
+version = st.session_state["editor_version"]
+
+
+# 1. Interface Information
+st.header("1. 인터페이스 정보 / Interface Information")
+
+edited = st.data_editor(
+    st.session_state["interface_info_df"],
+    use_container_width=True,
+    hide_index=True,
+    num_rows="fixed",
+    key=f"interface_info_editor_{version}",
+)
+st.session_state["interface_info_df"] = edited
+
+
+# 2. Transmission Information
+st.header("2. 전송 정보 / Transmission Information")
+
+left, right = st.columns(2)
+
+with left:
+    st.subheader("송신측 / Source Side")
+    edited = st.data_editor(
+        st.session_state["source_transmission_df"],
         use_container_width=True,
         hide_index=True,
-
-        # Source 原始字段不能修改
-        disabled=[
-            "Source Path",
-            "Source Field",
-        ],
-
-        column_config={
-
-            "Confidence":
-                st.column_config.NumberColumn(
-                    "Confidence",
-                    min_value=0,
-                    max_value=100,
-                ),
-
-            "Review Status":
-                st.column_config.SelectboxColumn(
-                    "Review Status",
-                    options=[
-                        "Pending",
-                        "Confirmed",
-                        "Rejected",
-                    ],
-                ),
-        },
-
-        key="mapping_editor",
+        num_rows="fixed",
+        key=f"source_transmission_editor_{version}",
     )
+    st.session_state["source_transmission_df"] = edited
 
-    st.session_state[
-        "mapping_df"
-    ] = edited_df
+with right:
+    st.subheader("수신측 / Target Side")
+    edited = st.data_editor(
+        st.session_state["target_transmission_df"],
+        use_container_width=True,
+        hide_index=True,
+        num_rows="fixed",
+        key=f"target_transmission_editor_{version}",
+    )
+    st.session_state["target_transmission_df"] = edited
+
+
+# 3. Mapping Specification
+st.header("3. 매핑 사양 / Mapping Specification")
+st.caption(
+    "AI 추천값과 최종 확정값을 별도로 관리합니다. / "
+    "AI suggestions and final reviewed values are kept separately."
+)
+
+edited = st.data_editor(
+    st.session_state["mapping_df"],
+    use_container_width=True,
+    hide_index=True,
+    num_rows="dynamic",
+    column_config={
+        "신뢰도 / Confidence":
+            st.column_config.NumberColumn(
+                "신뢰도 / Confidence",
+                min_value=0,
+                max_value=100,
+            ),
+        "매핑 상태 / Mapping Status":
+            st.column_config.SelectboxColumn(
+                "매핑 상태 / Mapping Status",
+                options=[
+                    "Pending",
+                    "Mapped",
+                    "Review Required",
+                    "Unmapped",
+                    "Rejected",
+                ],
+            ),
+    },
+    key=f"mapping_editor_{version}",
+)
+st.session_state["mapping_df"] = edited
+
+
+# 4. Return Value
+st.header("4. 반환값 / Return Value")
+
+edited = st.data_editor(
+    st.session_state["return_value_df"],
+    use_container_width=True,
+    hide_index=True,
+    num_rows="dynamic",
+    key=f"return_value_editor_{version}",
+)
+st.session_state["return_value_df"] = edited
