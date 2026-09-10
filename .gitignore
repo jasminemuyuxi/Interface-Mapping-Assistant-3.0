@@ -1,0 +1,11 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+.DS_Store
+# .gitignore 文件的内容，用来告诉 Git 哪些文件和目录不需要提交到代码仓库。
+# .venv/	忽略虚拟环境目录（体积大，且可以通过 requirements.txt 重新生成）
+# .env	忽略环境变量配置文件（里面可能存有密码、API 密钥等敏感信息）
+# __pycache__/	忽略 Python 编译后生成的字节码缓存目录（自动生成，无需提交）
+# *.pyc	忽略所有 .pyc 编译文件（同上）
+# .DS_Store	忽略 macOS 系统自动生成的文件夹元数据文件（无用且干扰）

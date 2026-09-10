@@ -1,0 +1,19 @@
+anthropic # call Claude API
+streamlit # 做你的前端网页
+python-dotenv #安全读取API Key  
+pydantic # 规定Claude必须输出固定Mapping结构
+pandas # 处理Mapping表  
+openpyxl # 成Excel 
+rapidfuzz # 字段名称相似度 
+pyyaml # 后续读取OpenAPI YAML 
+
+# """| Library       | 作用                      |
+# | ------------- | ----------------------- |
+# | anthropic     | 调用Claude API            |
+# | streamlit     | 做你的前端网页                 |
+# | python-dotenv | 安全读取API Key             |
+# | pydantic      | 规定Claude必须输出固定Mapping结构 |
+# | pandas        | 处理Mapping表              |
+# | openpyxl      | 生成Excel                 |
+# | rapidfuzz     | 字段名称相似度                 |
+# | pyyaml        | 后续读取OpenAPI YAML        |
