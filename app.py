@@ -477,7 +477,7 @@ structured output format.
                 response = (
                     client.messages.parse(
                         model=model_name,
-                        max_tokens=6000,
+                        max_tokens=7000,
                         messages=[
                             {
                                 "role": "user",
