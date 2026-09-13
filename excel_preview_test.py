@@ -108,25 +108,48 @@ return_value_df = pd.DataFrame([{
     "수신 비고 / Target Remark": "'S' 성공, 'F' 실패",
 }])
 
-excel_bytes = create_interface_mapping_excel(
+english_excel_bytes = create_interface_mapping_excel(
     interface_info_df=interface_info_df,
     source_transmission_df=source_transmission_df,
     target_transmission_df=target_transmission_df,
     mapping_df=mapping_df,
     return_value_df=return_value_df,
+    language="en",
 )
 
-st.success("Preview workbook is ready.")
-
-st.download_button(
-    label="⬇️ Download Mapping Specification Excel",
-    data=excel_bytes,
-    file_name="Interface_Mapping_Specification_Preview.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    type="primary",
+korean_excel_bytes = create_interface_mapping_excel(
+    interface_info_df=interface_info_df,
+    source_transmission_df=source_transmission_df,
+    target_transmission_df=target_transmission_df,
+    mapping_df=mapping_df,
+    return_value_df=return_value_df,
+    language="ko",
 )
+
+st.success("Preview workbooks are ready.")
+
+left, right = st.columns(2)
+
+with left:
+    st.download_button(
+        label="⬇️ Download English Excel",
+        data=english_excel_bytes,
+        file_name="Interface_Mapping_Specification_Preview.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type="primary",
+        use_container_width=True,
+    )
+
+with right:
+    st.download_button(
+        label="⬇️ 한국어 엑셀 다운로드",
+        data=korean_excel_bytes,
+        file_name="인터페이스 매핑 정의서.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
 
 st.info(
-    "This temporary page uses sample data that resembles the screenshot. "
-    "We will connect it to the real app DataFrames after the visual style is confirmed."
+    "This temporary page uses the same sample data for both language versions. "
+    "Only the exported workbook labels/title/sheet name are localized; the business data stays unchanged."
 )

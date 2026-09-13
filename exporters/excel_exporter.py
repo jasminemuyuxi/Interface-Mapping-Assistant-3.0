@@ -79,6 +79,92 @@ RETURN_TARGET_COLUMNS = [
 ]
 
 
+# Display text for exported workbook languages.
+# DataFrame column keys stay bilingual, so this only changes what users see in Excel.
+LANGUAGE_TEXT = {
+    "en": {
+        "sheet_name": "Mapping Specification",
+        "title": "INTERFACE DEFINITION [ Mapping Specification ]",
+        "creation_date": "Creation Date",
+        "author": "Author",
+        "interface_information": "Interface Information",
+        "interface_id": "Interface ID",
+        "interface_name": "Interface Name",
+        "interface_pattern": "Interface Pattern",
+        "schedule_driven": "Schedule Driven",
+        "execution_cycle": "Execution Cycle",
+        "max_records": "Max Records",
+        "average_records": "Average Records",
+        "split_count": "Split Count",
+        "transmission_information": "Transmission Information",
+        "source_side": "Source Side",
+        "target_side": "Target Side",
+        "contact_name": "Contact Name",
+        "department": "Department",
+        "contact": "Contact",
+        "integration_technology": "Integration Technology",
+        "source_server": "Source Server",
+        "target_server": "Target Server",
+        "database": "DB",
+        "adapter": "ADAPTER",
+        "query_pattern": "Query Pattern",
+        "processing_pattern": "Processing Pattern",
+        "mapping_specification": "Mapping Specification",
+        "mapping": "Mapping",
+        "system": "System",
+        "seq": "Seq.",
+        "table": "Table",
+        "pk": "PK",
+        "field_name": "Field Name",
+        "type": "Type",
+        "size": "Size",
+        "description": "Description",
+        "remark": "Remark",
+        "return_value": "Return Value",
+    },
+    "ko": {
+        "sheet_name": "매핑 정의서",
+        "title": "인터페이스 매핑 정의서",
+        "creation_date": "생성일",
+        "author": "작성자",
+        "interface_information": "인터페이스 정보",
+        "interface_id": "인터페이스 ID",
+        "interface_name": "인터페이스 명",
+        "interface_pattern": "인터페이스 패턴",
+        "schedule_driven": "스케줄 구동",
+        "execution_cycle": "실행 주기",
+        "max_records": "최대 레코드(건)",
+        "average_records": "평균 레코드(건)",
+        "split_count": "분할 건수",
+        "transmission_information": "전송 정보",
+        "source_side": "송신측",
+        "target_side": "수신측",
+        "contact_name": "담당자 명",
+        "department": "담당자 소속",
+        "contact": "담당자 연락처",
+        "integration_technology": "연계 기술",
+        "source_server": "Source Svr",
+        "target_server": "Target Svr",
+        "database": "DB",
+        "adapter": "ADAPTER",
+        "query_pattern": "조회 패턴",
+        "processing_pattern": "처리 패턴",
+        "mapping_specification": "매핑 사양",
+        "mapping": "Mapping",
+        "system": "시스템",
+        "seq": "순\n번",
+        "table": "테이블",
+        "pk": "PK",
+        "field_name": "필드명",
+        "type": "타입",
+        "size": "사이\n즈",
+        "description": "설명",
+        "remark": "비고",
+        "return_value": "반환값",
+    },
+}
+
+
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
@@ -290,6 +376,7 @@ def create_interface_mapping_excel(
     target_transmission_df,
     mapping_df,
     return_value_df,
+    language: str = "en",
 ) -> bytes:
     """
     Build a company-style Interface Mapping Specification workbook.
@@ -299,6 +386,11 @@ def create_interface_mapping_excel(
     st.download_button(data=...).
     """
 
+    if language not in LANGUAGE_TEXT:
+        raise ValueError("language must be 'en' or 'ko'")
+
+    text = LANGUAGE_TEXT[language]
+
     interface_info = _first_row(interface_info_df)
     source_tx = _first_row(source_transmission_df)
     target_tx = _first_row(target_transmission_df)
@@ -307,7 +399,7 @@ def create_interface_mapping_excel(
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Mapping Specification"
+    ws.title = text["sheet_name"]
     ws.sheet_view.showGridLines = False
 
     # Column widths: A:R (18 columns)
@@ -327,7 +419,7 @@ def create_interface_mapping_excel(
     _set_value(
         ws,
         "A1",
-        "INTERFACE DEFINITION [ Mapping Specification ]",
+        text["title"],
         bold=True,
         size=18,
         horizontal="center",
@@ -343,14 +435,14 @@ def create_interface_mapping_excel(
     # ------------------------------------------------------------------
     # Basic creation info
     # ------------------------------------------------------------------
-    _merge_label(ws, "A4:B4", "생성일")
+    _merge_label(ws, "A4:B4", text["creation_date"])
     _merge_value(
         ws,
         "C4:F4",
         interface_info.get("생성일 / Creation Date", ""),
         horizontal="center",
     )
-    _merge_label(ws, "G4:H4", "작성자")
+    _merge_label(ws, "G4:H4", text["author"])
     _merge_value(
         ws,
         "I4:R4",
@@ -360,70 +452,70 @@ def create_interface_mapping_excel(
     # ------------------------------------------------------------------
     # 1. Interface Information
     # ------------------------------------------------------------------
-    _section_bar(ws, 5, "Interface Information")
+    _section_bar(ws, 5, text["interface_information"])
 
-    _merge_label(ws, "A6:B6", "인터페이스 ID")
+    _merge_label(ws, "A6:B6", text["interface_id"])
     _merge_value(ws, "C6:F6", interface_info.get("인터페이스 ID / Interface ID", ""))
-    _merge_label(ws, "G6:H6", "인터페이스 명")
+    _merge_label(ws, "G6:H6", text["interface_name"])
     _merge_value(ws, "I6:R6", interface_info.get("인터페이스 명 / Interface Name", ""))
 
-    _merge_label(ws, "A7:B7", "인터페이스 패턴")
+    _merge_label(ws, "A7:B7", text["interface_pattern"])
     _merge_value(ws, "C7:F7", interface_info.get("인터페이스 패턴 / Interface Pattern", ""))
-    _merge_label(ws, "G7:H7", "스케줄 구동")
+    _merge_label(ws, "G7:H7", text["schedule_driven"])
     _merge_value(ws, "I7:L7", interface_info.get("스케줄 구동 / Schedule Driven", ""))
-    _merge_label(ws, "M7:N7", "실행 주기")
+    _merge_label(ws, "M7:N7", text["execution_cycle"])
     _merge_value(ws, "O7:R7", interface_info.get("실행 주기 / Execution Cycle", ""))
 
-    _merge_label(ws, "A8:B8", "최대 레코드(건)")
+    _merge_label(ws, "A8:B8", text["max_records"])
     _merge_value(ws, "C8:F8", interface_info.get("최대 레코드(건) / Max Records", ""))
-    _merge_label(ws, "G8:H8", "평균 레코드(건)")
+    _merge_label(ws, "G8:H8", text["average_records"])
     _merge_value(ws, "I8:L8", interface_info.get("평균 레코드(건) / Average Records", ""))
-    _merge_label(ws, "M8:N8", "분할 건수")
+    _merge_label(ws, "M8:N8", text["split_count"])
     _merge_value(ws, "O8:R8", interface_info.get("분할 건수 / Split Count", ""))
 
     # ------------------------------------------------------------------
     # 2. Transmission Information
     # ------------------------------------------------------------------
-    _section_bar(ws, 9, "Transmission Information")
+    _section_bar(ws, 9, text["transmission_information"])
 
     # Source side
-    _merge_label(ws, "A10:A17", "송신측")
-    _merge_label(ws, "B10:C10", "담당자 명")
+    _merge_label(ws, "A10:A17", text["source_side"])
+    _merge_label(ws, "B10:C10", text["contact_name"])
     _merge_value(ws, "D10:E10", source_tx.get("담당자 명 / Contact Name", ""))
-    _merge_label(ws, "F10:G10", "담당자 소속")
+    _merge_label(ws, "F10:G10", text["department"])
     _merge_value(ws, "H10:I10", source_tx.get("담당자 소속 / Department", ""))
 
-    _merge_label(ws, "B11:C11", "담당자 연락처")
+    _merge_label(ws, "B11:C11", text["contact"])
     _merge_value(ws, "D11:I11", source_tx.get("담당자 연락처 / Contact", ""))
-    _merge_label(ws, "B12:C12", "연계 기술")
+    _merge_label(ws, "B12:C12", text["integration_technology"])
     _merge_value(ws, "D12:I12", source_tx.get("연계 기술 / Integration Technology", ""))
-    _merge_label(ws, "B13:C13", "Source Svr")
+    _merge_label(ws, "B13:C13", text["source_server"])
     _merge_value(ws, "D13:I13", source_tx.get("Source Svr / Source Server", ""))
-    _merge_label(ws, "B14:C14", "DB")
+    _merge_label(ws, "B14:C14", text["database"])
     _merge_value(ws, "D14:I14", source_tx.get("DB / Database", ""))
-    _merge_label(ws, "B15:C15", "ADAPTER")
+    _merge_label(ws, "B15:C15", text["adapter"])
     _merge_value(ws, "D15:I15", source_tx.get("ADAPTER / Adapter", ""))
-    _merge_label(ws, "B16:C17", "조회 패턴")
+    _merge_label(ws, "B16:C17", text["query_pattern"])
     _merge_value(ws, "D16:I17", source_tx.get("조회 패턴 / Query Pattern", ""))
 
     # Target side
-    _merge_label(ws, "J10:J17", "수신측")
-    _merge_label(ws, "K10:L10", "담당자 명")
+    _merge_label(ws, "J10:J17", text["target_side"])
+    _merge_label(ws, "K10:L10", text["contact_name"])
     _merge_value(ws, "M10:N10", target_tx.get("담당자 명 / Contact Name", ""))
-    _merge_label(ws, "O10:P10", "담당자 소속")
+    _merge_label(ws, "O10:P10", text["department"])
     _merge_value(ws, "Q10:R10", target_tx.get("담당자 소속 / Department", ""))
 
-    _merge_label(ws, "K11:L11", "담당자 연락처")
+    _merge_label(ws, "K11:L11", text["contact"])
     _merge_value(ws, "M11:R11", target_tx.get("담당자 연락처 / Contact", ""))
-    _merge_label(ws, "K12:L12", "연계 기술")
+    _merge_label(ws, "K12:L12", text["integration_technology"])
     _merge_value(ws, "M12:R12", target_tx.get("연계 기술 / Integration Technology", ""))
-    _merge_label(ws, "K13:L13", "Target Svr")
+    _merge_label(ws, "K13:L13", text["target_server"])
     _merge_value(ws, "M13:R13", target_tx.get("Target Svr / Target Server", ""))
-    _merge_label(ws, "K14:L14", "DB")
+    _merge_label(ws, "K14:L14", text["database"])
     _merge_value(ws, "M14:R14", target_tx.get("DB / Database", ""))
-    _merge_label(ws, "K15:L15", "ADAPTER")
+    _merge_label(ws, "K15:L15", text["adapter"])
     _merge_value(ws, "M15:R15", target_tx.get("ADAPTER / Adapter", ""))
-    _merge_label(ws, "K16:L17", "처리 패턴")
+    _merge_label(ws, "K16:L17", text["processing_pattern"])
     _merge_value(ws, "M16:R17", target_tx.get("처리 패턴 / Processing Pattern", ""))
 
     for row in range(10, 18):
@@ -434,25 +526,29 @@ def create_interface_mapping_excel(
     # ------------------------------------------------------------------
     # 3. Mapping Specification
     # ------------------------------------------------------------------
-    _section_bar(ws, 18, "Mapping Specification")
+    _section_bar(ws, 18, text["mapping_specification"])
 
     # Group headers
     ws.merge_cells("A19:I19")
-    _set_value(ws, "A19", "송신측", bold=True, horizontal="center")
+    _set_value(ws, "A19", text["source_side"], bold=True, horizontal="center")
     _style_range(ws, "A19:I19", fill=PALE_YELLOW, bold=True)
 
     ws.merge_cells("J19:J20")
-    _set_value(ws, "J19", "Mapping", bold=True, horizontal="center")
+    _set_value(ws, "J19", text["mapping"], bold=True, horizontal="center")
     _style_range(ws, "J19:J20", fill=PALE_YELLOW, bold=True)
 
     ws.merge_cells("K19:R19")
-    _set_value(ws, "K19", "수신측", bold=True, horizontal="center")
+    _set_value(ws, "K19", text["target_side"], bold=True, horizontal="center")
     _style_range(ws, "K19:R19", fill=PALE_YELLOW, bold=True)
 
     headers = [
-        "시스템", "순\n번", "테이블", "PK", "필드명", "타입", "사이\n즈", "설명", "비고",
-        "Mapping",
-        "시스템", "테이블", "PK", "필드명", "타입", "사이\n즈", "설명", "비고",
+        text["system"], text["seq"], text["table"], text["pk"],
+        text["field_name"], text["type"], text["size"],
+        text["description"], text["remark"],
+        text["mapping"],
+        text["system"], text["table"], text["pk"],
+        text["field_name"], text["type"], text["size"],
+        text["description"], text["remark"],
     ]
 
     # J20 belongs to merged J19:J20, so skip it.
@@ -523,7 +619,7 @@ def create_interface_mapping_excel(
     _set_value(
         ws,
         f"A{return_title_row}",
-        "Return Value",
+        text["return_value"],
         bold=True,
         horizontal="left",
     )
@@ -568,7 +664,7 @@ def create_interface_mapping_excel(
     # ------------------------------------------------------------------
     # Print / page setup
     # ------------------------------------------------------------------
-    ws.freeze_panes = "A21"
+    ws.freeze_panes = None
     ws.print_area = f"A1:R{final_row}"
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.orientation = "landscape"

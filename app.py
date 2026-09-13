@@ -1,4 +1,3 @@
-
 import hashlib
 import json
 import os
@@ -114,7 +113,20 @@ def read_json_file(uploaded_file):
 def get_allowed_file_types(interface_type):
     return {
         "JSON": ["json"],
-        "PDF": ["pdf"],
+        "File": [
+            "pdf",
+            "docx",
+            "xlsx",
+            "xls",
+            "xlsm",
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "bmp",
+            "tif",
+            "tiff",
+        ],
         "Swagger": ["json", "yaml", "yml"],
         "EDI": ["edi", "txt"],
         "Open API": ["json", "yaml", "yml"],
@@ -213,6 +225,104 @@ RETURN_VALUE_COLUMNS = [
 
 
 # =========================
+# English-only UI labels
+# Internal DataFrame keys remain unchanged so current AI logic and
+# Excel exporter can continue using the existing column names.
+# =========================
+INTERFACE_INFO_UI_LABELS = {
+    "생성일 / Creation Date": "Creation Date",
+    "작성자 / Author": "Author",
+    "인터페이스 ID / Interface ID": "Interface ID",
+    "인터페이스 명 / Interface Name": "Interface Name",
+    "인터페이스 패턴 / Interface Pattern": "Interface Pattern",
+    "스케줄 구동 / Schedule Driven": "Schedule Driven",
+    "실행 주기 / Execution Cycle": "Execution Cycle",
+    "최대 레코드(건) / Max Records": "Max Records",
+    "평균 레코드(건) / Average Records": "Average Records",
+    "분할 건수 / Split Count": "Split Count",
+}
+
+SOURCE_TRANSMISSION_UI_LABELS = {
+    "담당자 명 / Contact Name": "Contact Name",
+    "담당자 소속 / Department": "Department",
+    "담당자 연락처 / Contact": "Contact",
+    "연계 기술 / Integration Technology": "Integration Technology",
+    "Source Svr / Source Server": "Source Svr",
+    "DB / Database": "DB",
+    "ADAPTER / Adapter": "ADAPTER",
+    "조회 패턴 / Query Pattern": "Query Pattern",
+}
+
+TARGET_TRANSMISSION_UI_LABELS = {
+    "담당자 명 / Contact Name": "Contact Name",
+    "담당자 소속 / Department": "Department",
+    "담당자 연락처 / Contact": "Contact",
+    "연계 기술 / Integration Technology": "Integration Technology",
+    "Target Svr / Target Server": "Target Svr",
+    "DB / Database": "DB",
+    "ADAPTER / Adapter": "ADAPTER",
+    "처리 패턴 / Processing Pattern": "Processing Pattern",
+}
+
+MAPPING_UI_LABELS = {
+    "송신 시스템 / Source System": "Source System",
+    "순번 / Seq.": "Seq.",
+    "송신 테이블 / Source Table": "Source Table",
+    "송신 PK / Source PK": "Source PK",
+    "송신 경로 / Source Path": "Source Path",
+    "송신 필드명 / Source Field": "Source Field",
+    "송신 타입 / Source Type": "Source Type",
+    "송신 사이즈 / Source Size": "Source Size",
+    "송신 설명 / Source Description": "Source Description",
+    "송신 비고 / Source Remark": "Source Remark",
+    "Mapping / Mapping": "Mapping",
+    "AI 추천 대상 경로 / AI Suggested Target Path": "AI Suggested Target Path",
+    "AI 추천 대상 필드 / AI Suggested Target Field": "AI Suggested Target Field",
+    "최종 대상 경로 / Final Target Path": "Final Target Path",
+    "최종 대상 필드 / Final Target Field": "Final Target Field",
+    "수신 시스템 / Target System": "Target System",
+    "수신 테이블 / Target Table": "Target Table",
+    "수신 PK / Target PK": "Target PK",
+    "수신 타입 / Target Type": "Target Type",
+    "수신 사이즈 / Target Size": "Target Size",
+    "수신 설명 / Target Description": "Target Description",
+    "수신 비고 / Target Remark": "Target Remark",
+    "AI 대상 존재 여부 / AI Target Exists": "AI Target Exists",
+    "매핑 상태 / Mapping Status": "Mapping Status",
+    "신뢰도 / Confidence": "Confidence",
+    "AI 판단 근거 / AI Reason": "AI Reason",
+}
+
+RETURN_VALUE_UI_LABELS = {
+    "송신 시스템 / Source System": "Source System",
+    "순번 / Seq.": "Seq.",
+    "송신 테이블 / Source Table": "Source Table",
+    "송신 PK / Source PK": "Source PK",
+    "송신 필드명 / Source Field": "Source Field",
+    "송신 타입 / Source Type": "Source Type",
+    "송신 사이즈 / Source Size": "Source Size",
+    "송신 설명 / Source Description": "Source Description",
+    "송신 비고 / Source Remark": "Source Remark",
+    "Mapping / Mapping": "Mapping",
+    "수신 시스템 / Target System": "Target System",
+    "수신 테이블 / Target Table": "Target Table",
+    "수신 PK / Target PK": "Target PK",
+    "수신 필드명 / Target Field": "Target Field",
+    "수신 타입 / Target Type": "Target Type",
+    "수신 사이즈 / Target Size": "Target Size",
+    "수신 설명 / Target Description": "Target Description",
+    "수신 비고 / Target Remark": "Target Remark",
+}
+
+
+def make_text_column_config(label_map):
+    return {
+        internal_name: st.column_config.TextColumn(display_name)
+        for internal_name, display_name in label_map.items()
+    }
+
+
+# =========================
 # DataFrame builders
 # =========================
 def one_row_df(columns, initial=None):
@@ -304,13 +414,19 @@ st.caption("AI-powered interface field mapping assistant")
 
 interface_types = [
     "JSON",
-    "PDF",
+    "File",
     "Swagger",
     "EDI",
     "Open API",
     "SOAP",
     "Other",
 ]
+
+FILE_FORMAT_HINT = (
+    "PDF (.pdf) · Word (.docx) · "
+    "Excel (.xlsx, .xls, .xlsm) · "
+    "Images (.png, .jpg, .jpeg, .webp, .bmp, .tif, .tiff)"
+)
 
 
 # =========================
@@ -320,26 +436,38 @@ left, right = st.columns(2)
 
 with left:
     st.subheader("Source Interface")
+
     source_interface_type = st.selectbox(
-        "인터페이스 형식 / Interface Type",
+        "Interface Type",
         interface_types,
         key="source_interface_type",
+        help="Choose File for PDF, Word, Excel, or common image formats.",
     )
+
+    if source_interface_type == "File":
+        st.caption(f"📎 Supported formats: {FILE_FORMAT_HINT}")
+
     source_file = st.file_uploader(
-        "송신 인터페이스 업로드 / Upload Source Interface",
+        "Upload Source Interface",
         type=get_allowed_file_types(source_interface_type),
         key="source_interface",
     )
 
 with right:
     st.subheader("Target Interface")
+
     target_interface_type = st.selectbox(
-        "인터페이스 형식 / Interface Type",
+        "Interface Type",
         interface_types,
         key="target_interface_type",
+        help="Choose File for PDF, Word, Excel, or common image formats.",
     )
+
+    if target_interface_type == "File":
+        st.caption(f"📎 Supported formats: {FILE_FORMAT_HINT}")
+
     target_file = st.file_uploader(
-        "수신 인터페이스 업로드 / Upload Target Interface",
+        "Upload Target Interface",
         type=get_allowed_file_types(target_interface_type),
         key="target_interface",
     )
@@ -356,10 +484,10 @@ if source_file is not None:
         try:
             source_fields = flatten_json(read_json_file(source_file))
         except Exception as e:
-            st.error(f"Source JSON 读取失败：{e}")
+            st.error(f"Failed to read Source JSON: {e}")
     else:
         st.info(
-            f"Source：{source_interface_type} 解析功能暂未开发。"
+            f"Source {source_interface_type} parser is not available yet."
         )
 
 if target_file is not None:
@@ -367,10 +495,10 @@ if target_file is not None:
         try:
             target_fields = flatten_json(read_json_file(target_file))
         except Exception as e:
-            st.error(f"Target JSON 读取失败：{e}")
+            st.error(f"Failed to read Target JSON: {e}")
     else:
         st.info(
-            f"Target：{target_interface_type} 解析功能暂未开发。"
+            f"Target {target_interface_type} parser is not available yet."
         )
 
 
@@ -403,15 +531,15 @@ if source_fields is not None and target_fields is not None:
     st.divider()
 
     if st.button(
-        "AI 분석 및 Mapping 생성 / Generate AI Analysis & Mapping",
+        "Generate AI Analysis & Mapping",
         type="primary",
     ):
         if not api_key:
-            st.error("没有找到 ANTHROPIC_API_KEY。")
+            st.error("ANTHROPIC_API_KEY was not found.")
             st.stop()
 
         if not workspace_id:
-            st.error("没有找到 ANTHROPIC_WORKSPACE_ID。")
+            st.error("ANTHROPIC_WORKSPACE_ID was not found.")
             st.stop()
 
         client = Anthropic(
@@ -478,7 +606,7 @@ otherwise use "".
                 )
                 ai = response.parsed_output
             except Exception as e:
-                st.error(f"Claude API 调用失败：{e}")
+                st.error(f"Claude API call failed: {e}")
                 st.stop()
 
         # 1. Interface Information
@@ -711,50 +839,52 @@ version = st.session_state["editor_version"]
 
 
 # 1. Interface Information
-st.header("1. 인터페이스 정보 / Interface Information")
+st.header("1. Interface Information")
 
 edited = st.data_editor(
     st.session_state["interface_info_df"],
     use_container_width=True,
     hide_index=True,
     num_rows="fixed",
+    column_config=make_text_column_config(INTERFACE_INFO_UI_LABELS),
     key=f"interface_info_editor_{version}",
 )
 st.session_state["interface_info_df"] = edited
 
 
 # 2. Transmission Information
-st.header("2. 전송 정보 / Transmission Information")
+st.header("2. Transmission Information")
 
 left, right = st.columns(2)
 
 with left:
-    st.subheader("송신측 / Source Side")
+    st.subheader("Source Side")
     edited = st.data_editor(
         st.session_state["source_transmission_df"],
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
+        column_config=make_text_column_config(SOURCE_TRANSMISSION_UI_LABELS),
         key=f"source_transmission_editor_{version}",
     )
     st.session_state["source_transmission_df"] = edited
 
 with right:
-    st.subheader("수신측 / Target Side")
+    st.subheader("Target Side")
     edited = st.data_editor(
         st.session_state["target_transmission_df"],
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
+        column_config=make_text_column_config(TARGET_TRANSMISSION_UI_LABELS),
         key=f"target_transmission_editor_{version}",
     )
     st.session_state["target_transmission_df"] = edited
 
 
 # 3. Mapping Specification
-st.header("3. 매핑 사양 / Mapping Specification")
+st.header("3. Mapping Specification")
 st.caption(
-    "AI 추천값과 최종 확정값을 별도로 관리합니다. / "
     "AI suggestions and final reviewed values are kept separately."
 )
 
@@ -764,23 +894,23 @@ edited = st.data_editor(
     hide_index=True,
     num_rows="dynamic",
     column_config={
-        "신뢰도 / Confidence":
-            st.column_config.NumberColumn(
-                "신뢰도 / Confidence",
-                min_value=0,
-                max_value=100,
-            ),
-        "매핑 상태 / Mapping Status":
-            st.column_config.SelectboxColumn(
-                "매핑 상태 / Mapping Status",
-                options=[
-                    "Pending",
-                    "Mapped",
-                    "Review Required",
-                    "Unmapped",
-                    "Rejected",
-                ],
-            ),
+        **make_text_column_config(MAPPING_UI_LABELS),
+        "순번 / Seq.": st.column_config.NumberColumn("Seq."),
+        "신뢰도 / Confidence": st.column_config.NumberColumn(
+            "Confidence",
+            min_value=0,
+            max_value=100,
+        ),
+        "매핑 상태 / Mapping Status": st.column_config.SelectboxColumn(
+            "Mapping Status",
+            options=[
+                "Pending",
+                "Mapped",
+                "Review Required",
+                "Unmapped",
+                "Rejected",
+            ],
+        ),
     },
     key=f"mapping_editor_{version}",
 )
@@ -788,13 +918,17 @@ st.session_state["mapping_df"] = edited
 
 
 # 4. Return Value
-st.header("4. 반환값 / Return Value")
+st.header("4. Return Value")
 
 edited = st.data_editor(
     st.session_state["return_value_df"],
     use_container_width=True,
     hide_index=True,
     num_rows="dynamic",
+    column_config={
+        **make_text_column_config(RETURN_VALUE_UI_LABELS),
+        "순번 / Seq.": st.column_config.NumberColumn("Seq."),
+    },
     key=f"return_value_editor_{version}",
 )
 st.session_state["return_value_df"] = edited
