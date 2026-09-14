@@ -9,7 +9,9 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+from mapping.mapping_service import build_mapping_rows
 from parsers.json_parser import flatten_json
+from ui.mapping_grid import render_mapping_grid
 
 
 # =========================
@@ -24,51 +26,26 @@ model_name = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 
 # =========================
 # Claude structured output
+# JSON mode:
+# AI is currently used only for Mapping Specification
+# and Return Value.
 # =========================
-class InterfaceInfoAI(BaseModel):
-    creation_date: str
-    author: str
-    interface_id: str
-    interface_name: str
-    interface_pattern: str
-    schedule_driven: str
-    execution_cycle: str
-    max_records: str
-    average_records: str
-    split_count: str
-
-
-class TransmissionAI(BaseModel):
-    contact_name: str
-    department: str
-    contact: str
-    integration_technology: str
-    server: str
-    database: str
-    adapter: str
-    processing_pattern: str
-
-
 class MappingItemAI(BaseModel):
     source_path: str
     source_field: str
     source_system: str
-    source_table: str
     source_pk: str
     source_type: str
     source_size: str
     source_description: str
-    source_remark: str
 
     target_path: str
     target_field: str
     target_system: str
-    target_table: str
     target_pk: str
     target_type: str
     target_size: str
     target_description: str
-    target_remark: str
 
     confidence: int
     reason: str
@@ -94,10 +71,7 @@ class ReturnValueAI(BaseModel):
     target_remark: str
 
 
-class AnalysisResult(BaseModel):
-    interface_information: InterfaceInfoAI
-    source_transmission: TransmissionAI
-    target_transmission: TransmissionAI
+class MappingAnalysisResult(BaseModel):
     mappings: list[MappingItemAI]
     return_values: list[ReturnValueAI]
 
@@ -173,33 +147,33 @@ TARGET_TRANSMISSION_COLUMNS = [
     "처리 패턴 / Processing Pattern",
 ]
 
-MAPPING_COLUMNS = [
-    "송신 시스템 / Source System",
-    "순번 / Seq.",
-    "송신 테이블 / Source Table",
-    "송신 PK / Source PK",
-    "송신 경로 / Source Path",
-    "송신 필드명 / Source Field",
-    "송신 타입 / Source Type",
-    "송신 사이즈 / Source Size",
-    "송신 설명 / Source Description",
-    "송신 비고 / Source Remark",
-    "Mapping / Mapping",
-    "AI 추천 대상 경로 / AI Suggested Target Path",
-    "AI 추천 대상 필드 / AI Suggested Target Field",
-    "최종 대상 경로 / Final Target Path",
-    "최종 대상 필드 / Final Target Field",
-    "수신 시스템 / Target System",
-    "수신 테이블 / Target Table",
-    "수신 PK / Target PK",
-    "수신 타입 / Target Type",
-    "수신 사이즈 / Target Size",
-    "수신 설명 / Target Description",
-    "수신 비고 / Target Remark",
-    "AI 대상 존재 여부 / AI Target Exists",
-    "매핑 상태 / Mapping Status",
-    "신뢰도 / Confidence",
-    "AI 판단 근거 / AI Reason",
+# Internal Mapping data model used by mapping_service.py + mapping_grid.py.
+# Some fields (Path / Confidence / AI Reason) are intentionally kept hidden
+# from the front-end grid for validation and future review features.
+MAPPING_GRID_COLUMNS = [
+    "source_path",
+    "source_system",
+    "source_seq",
+    "source_table",
+    "source_pk",
+    "source_field",
+    "source_type",
+    "source_size",
+    "source_description",
+    "source_remark",
+    "mapping",
+    "mapping_status",
+    "target_path",
+    "target_system",
+    "target_table",
+    "target_pk",
+    "target_field",
+    "target_type",
+    "target_size",
+    "target_description",
+    "target_remark",
+    "confidence",
+    "ai_reason",
 ]
 
 RETURN_VALUE_COLUMNS = [
@@ -226,8 +200,7 @@ RETURN_VALUE_COLUMNS = [
 
 # =========================
 # English-only UI labels
-# Internal DataFrame keys remain unchanged so current AI logic and
-# Excel exporter can continue using the existing column names.
+# Internal DataFrame keys remain unchanged for Sections 1, 2 and 4.
 # =========================
 INTERFACE_INFO_UI_LABELS = {
     "생성일 / Creation Date": "Creation Date",
@@ -262,35 +235,6 @@ TARGET_TRANSMISSION_UI_LABELS = {
     "DB / Database": "DB",
     "ADAPTER / Adapter": "ADAPTER",
     "처리 패턴 / Processing Pattern": "Processing Pattern",
-}
-
-MAPPING_UI_LABELS = {
-    "송신 시스템 / Source System": "Source System",
-    "순번 / Seq.": "Seq.",
-    "송신 테이블 / Source Table": "Source Table",
-    "송신 PK / Source PK": "Source PK",
-    "송신 경로 / Source Path": "Source Path",
-    "송신 필드명 / Source Field": "Source Field",
-    "송신 타입 / Source Type": "Source Type",
-    "송신 사이즈 / Source Size": "Source Size",
-    "송신 설명 / Source Description": "Source Description",
-    "송신 비고 / Source Remark": "Source Remark",
-    "Mapping / Mapping": "Mapping",
-    "AI 추천 대상 경로 / AI Suggested Target Path": "AI Suggested Target Path",
-    "AI 추천 대상 필드 / AI Suggested Target Field": "AI Suggested Target Field",
-    "최종 대상 경로 / Final Target Path": "Final Target Path",
-    "최종 대상 필드 / Final Target Field": "Final Target Field",
-    "수신 시스템 / Target System": "Target System",
-    "수신 테이블 / Target Table": "Target Table",
-    "수신 PK / Target PK": "Target PK",
-    "수신 타입 / Target Type": "Target Type",
-    "수신 사이즈 / Target Size": "Target Size",
-    "수신 설명 / Target Description": "Target Description",
-    "수신 비고 / Target Remark": "Target Remark",
-    "AI 대상 존재 여부 / AI Target Exists": "AI Target Exists",
-    "매핑 상태 / Mapping Status": "Mapping Status",
-    "신뢰도 / Confidence": "Confidence",
-    "AI 판단 근거 / AI Reason": "AI Reason",
 }
 
 RETURN_VALUE_UI_LABELS = {
@@ -340,27 +284,75 @@ def build_interface_info_df():
 
 
 def build_mapping_df(source_fields=None):
+    """
+    Initial Mapping grid before AI analysis.
+
+    Parsed Source fields are shown as Pending.
+    AI will later replace this DataFrame with the result from
+    build_mapping_rows().
+    """
     rows = []
 
     if source_fields:
         for seq, field in enumerate(source_fields, start=1):
-            row = {column: "" for column in MAPPING_COLUMNS}
-            row["순번 / Seq."] = seq
-            row["송신 경로 / Source Path"] = field["Path"]
-            row["송신 필드명 / Source Field"] = field["Field"]
-            row["송신 타입 / Source Type"] = field["Type"]
-            row["Mapping / Mapping"] = "->"
-            row["매핑 상태 / Mapping Status"] = "Pending"
-            rows.append(row)
+            rows.append(
+                {
+                    "source_path": field.get("Path", ""),
+                    "source_system": "",
+                    "source_seq": seq,
+                    "source_table": "",
+                    "source_pk": "",
+                    "source_field": field.get("Field", ""),
+                    "source_type": field.get("Type", ""),
+                    "source_size": "",
+                    "source_description": "",
+                    "source_remark": "",
+                    "mapping": "",
+                    "mapping_status": "Pending",
+                    "target_path": "",
+                    "target_system": "",
+                    "target_table": "",
+                    "target_pk": "",
+                    "target_field": "",
+                    "target_type": "",
+                    "target_size": "",
+                    "target_description": "",
+                    "target_remark": "",
+                    "confidence": "",
+                    "ai_reason": "",
+                }
+            )
 
     if not rows:
-        row = {column: "" for column in MAPPING_COLUMNS}
-        row["순번 / Seq."] = 1
-        row["Mapping / Mapping"] = "->"
-        row["매핑 상태 / Mapping Status"] = "Pending"
-        rows.append(row)
+        rows.append(
+            {
+                "source_path": "",
+                "source_system": "",
+                "source_seq": 1,
+                "source_table": "",
+                "source_pk": "",
+                "source_field": "",
+                "source_type": "",
+                "source_size": "",
+                "source_description": "",
+                "source_remark": "",
+                "mapping": "",
+                "mapping_status": "Pending",
+                "target_path": "",
+                "target_system": "",
+                "target_table": "",
+                "target_pk": "",
+                "target_field": "",
+                "target_type": "",
+                "target_size": "",
+                "target_description": "",
+                "target_remark": "",
+                "confidence": "",
+                "ai_reason": "",
+            }
+        )
 
-    return pd.DataFrame(rows, columns=MAPPING_COLUMNS)
+    return pd.DataFrame(rows, columns=MAPPING_GRID_COLUMNS)
 
 
 def build_return_df():
@@ -388,15 +380,74 @@ def reset_data(source_fields=None):
     )
 
 
-def merge_first_row(df, values):
-    result = df.copy()
-    for column, value in values.items():
-        if (
-            column in result.columns
-            and value is not None
-            and str(value).strip() != ""
-        ):
-            result.at[0, column] = value
+# =========================
+# Mapping enrichment helpers
+# =========================
+def enrich_source_fields(source_fields, ai_mappings):
+    ai_by_path = {
+        item.source_path: item
+        for item in ai_mappings
+        if item.source_path
+    }
+
+    result = []
+
+    for field in source_fields:
+        item = ai_by_path.get(field.get("Path", ""))
+
+        result.append(
+            {
+                "Path": field.get("Path", ""),
+                "Field": field.get("Field", ""),
+                "System": item.source_system if item else "",
+                "PK": item.source_pk if item else "",
+                "Type": (
+                    item.source_type
+                    if item and item.source_type
+                    else field.get("Type", "")
+                ),
+                "Size": item.source_size if item else "",
+                "Description": (
+                    item.source_description if item else ""
+                ),
+            }
+        )
+
+    return result
+
+
+def enrich_target_fields(target_fields, ai_mappings):
+    ai_by_path = {}
+
+    # The same Target may be referenced more than once.
+    # Keep the first AI record containing useful Target metadata.
+    for item in ai_mappings:
+        if item.target_path and item.target_path not in ai_by_path:
+            ai_by_path[item.target_path] = item
+
+    result = []
+
+    for field in target_fields:
+        item = ai_by_path.get(field.get("Path", ""))
+
+        result.append(
+            {
+                "Path": field.get("Path", ""),
+                "Field": field.get("Field", ""),
+                "System": item.target_system if item else "",
+                "PK": item.target_pk if item else "",
+                "Type": (
+                    item.target_type
+                    if item and item.target_type
+                    else field.get("Type", "")
+                ),
+                "Size": item.target_size if item else "",
+                "Description": (
+                    item.target_description if item else ""
+                ),
+            }
+        )
+
     return result
 
 
@@ -509,10 +560,12 @@ signature_parts = [source_interface_type, target_interface_type]
 
 for uploaded in [source_file, target_file]:
     if uploaded is not None:
-        signature_parts.extend([
-            uploaded.name,
-            hashlib.sha256(uploaded.getvalue()).hexdigest(),
-        ])
+        signature_parts.extend(
+            [
+                uploaded.name,
+                hashlib.sha256(uploaded.getvalue()).hexdigest(),
+            ]
+        )
 
 signature = "|".join(signature_parts)
 
@@ -552,21 +605,22 @@ if source_fields is not None and target_fields is not None:
         prompt = f"""
 You are an enterprise interface mapping specialist.
 
-Analyze these interfaces and populate four sections:
+For this JSON-to-JSON analysis, analyze ONLY:
 
-1. Interface Information
-2. Transmission Information
-3. Mapping Specification
-4. Return Value
+1. Mapping Specification
+2. Return Value
 
-IMPORTANT:
+Do NOT populate Interface Information or Transmission Information.
+Those sections are maintained manually for JSON interfaces.
+
+IMPORTANT GENERAL RULES:
 - Never invent unsupported information.
-- If information cannot be determined, return "".
+- Unknown information must be returned as "".
+- Do not force a mapping.
 - Analyze every Source field.
 - Always use full Path + Field together.
 - Duplicate Field names may exist under different Paths.
-- Do not force a mapping.
-- If no valid Target exists, return target_path="" and target_field="".
+- If no reliable Target exists, return target_path="" and target_field="".
 - If no explicit return/response fields exist, return return_values=[].
 
 SOURCE FILE: {source_file.name}
@@ -578,20 +632,35 @@ SOURCE FIELDS:
 TARGET FIELDS:
 {json.dumps(target_fields, ensure_ascii=False, indent=2)}
 
-Mapping rules:
+MAPPING RULES:
 - source_path must exactly match an existing Source Path.
 - source_field must match the Field belonging to source_path.
+- Return one mapping item for every Source field.
 - target_path must exactly match an existing Target Path,
-  or be "" when Unmapped.
+  or be "" when no reliable match exists.
 - target_field must match the Field belonging to target_path,
-  or be "" when Unmapped.
-- confidence must be 0-100.
-- reason must briefly explain the judgment.
+  or be "" when no reliable match exists.
 
-For system/table/PK/type/size/description/remark,
-Interface Information, and Transmission Information:
-fill only when supported or reasonably inferable;
-otherwise use "".
+FIELD EXTRACTION RULES:
+- source_system / target_system:
+  extract only when supported by the input. Otherwise "".
+- source_pk / target_pk:
+  return "PK" only when the field can be identified as a primary key.
+  Otherwise "".
+- source_type / target_type:
+  use explicit type information when available.
+  For JSON, the parsed type may be used as the base type.
+  If type is genuinely unknown, return "" rather than inventing one.
+- source_size / target_size:
+  fill only when supported by schema/document information.
+  Do not treat the length of one sample value as the field's maximum size.
+- source_description / target_description:
+  fill only when supported by interface documentation or clear schema context.
+  Otherwise "".
+- Table is a manual-entry field and must not be inferred by AI.
+- Remark is a manual-entry field and must not be inferred by AI.
+- confidence must be 0-100.
+- reason must briefly explain the mapping judgment.
 """
 
         with st.spinner("Claude is analyzing the interfaces..."):
@@ -602,232 +671,95 @@ otherwise use "".
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
-                    output_format=AnalysisResult,
+                    output_format=MappingAnalysisResult,
                 )
                 ai = response.parsed_output
             except Exception as e:
                 st.error(f"Claude API call failed: {e}")
                 st.stop()
 
-        # 1. Interface Information
-        st.session_state["interface_info_df"] = merge_first_row(
-            st.session_state["interface_info_df"],
-            {
-                "생성일 / Creation Date":
-                    ai.interface_information.creation_date,
-                "작성자 / Author":
-                    ai.interface_information.author,
-                "인터페이스 ID / Interface ID":
-                    ai.interface_information.interface_id,
-                "인터페이스 명 / Interface Name":
-                    ai.interface_information.interface_name,
-                "인터페이스 패턴 / Interface Pattern":
-                    ai.interface_information.interface_pattern,
-                "스케줄 구동 / Schedule Driven":
-                    ai.interface_information.schedule_driven,
-                "실행 주기 / Execution Cycle":
-                    ai.interface_information.execution_cycle,
-                "최대 레코드(건) / Max Records":
-                    ai.interface_information.max_records,
-                "평균 레코드(건) / Average Records":
-                    ai.interface_information.average_records,
-                "분할 건수 / Split Count":
-                    ai.interface_information.split_count,
-            },
-        )
-
-        # 2. Transmission Information
-        st.session_state["source_transmission_df"] = merge_first_row(
-            st.session_state["source_transmission_df"],
-            {
-                "담당자 명 / Contact Name":
-                    ai.source_transmission.contact_name,
-                "담당자 소속 / Department":
-                    ai.source_transmission.department,
-                "담당자 연락처 / Contact":
-                    ai.source_transmission.contact,
-                "연계 기술 / Integration Technology":
-                    ai.source_transmission.integration_technology,
-                "Source Svr / Source Server":
-                    ai.source_transmission.server,
-                "DB / Database":
-                    ai.source_transmission.database,
-                "ADAPTER / Adapter":
-                    ai.source_transmission.adapter,
-                "조회 패턴 / Query Pattern":
-                    ai.source_transmission.processing_pattern,
-            },
-        )
-
-        st.session_state["target_transmission_df"] = merge_first_row(
-            st.session_state["target_transmission_df"],
-            {
-                "담당자 명 / Contact Name":
-                    ai.target_transmission.contact_name,
-                "담당자 소속 / Department":
-                    ai.target_transmission.department,
-                "담당자 연락처 / Contact":
-                    ai.target_transmission.contact,
-                "연계 기술 / Integration Technology":
-                    ai.target_transmission.integration_technology,
-                "Target Svr / Target Server":
-                    ai.target_transmission.server,
-                "DB / Database":
-                    ai.target_transmission.database,
-                "ADAPTER / Adapter":
-                    ai.target_transmission.adapter,
-                "처리 패턴 / Processing Pattern":
-                    ai.target_transmission.processing_pattern,
-            },
-        )
-
+        # =========================
         # 3. Mapping Specification
-        target_by_path = {
-            field["Path"]: field for field in target_fields
-        }
-        ai_by_source_path = {
-            item.source_path: item for item in ai.mappings
-        }
+        # =========================
+        enriched_source_fields = enrich_source_fields(
+            source_fields,
+            ai.mappings,
+        )
+        enriched_target_fields = enrich_target_fields(
+            target_fields,
+            ai.mappings,
+        )
 
-        mapping_rows = []
+        ai_mapping_dicts = [
+            item.model_dump()
+            for item in ai.mappings
+        ]
 
-        for seq, source in enumerate(source_fields, start=1):
-            item = ai_by_source_path.get(source["Path"])
-            row = {column: "" for column in MAPPING_COLUMNS}
-
-            row["순번 / Seq."] = seq
-            row["송신 경로 / Source Path"] = source["Path"]
-            row["송신 필드명 / Source Field"] = source["Field"]
-            row["송신 타입 / Source Type"] = source["Type"]
-            row["Mapping / Mapping"] = "->"
-
-            if item is None:
-                row["AI 대상 존재 여부 / AI Target Exists"] = "NO"
-                row["매핑 상태 / Mapping Status"] = "Unmapped"
-                mapping_rows.append(row)
-                continue
-
-            row["송신 시스템 / Source System"] = item.source_system
-            row["송신 테이블 / Source Table"] = item.source_table
-            row["송신 PK / Source PK"] = item.source_pk
-            row["송신 타입 / Source Type"] = (
-                item.source_type or source["Type"]
-            )
-            row["송신 사이즈 / Source Size"] = item.source_size
-            row["송신 설명 / Source Description"] = (
-                item.source_description
-            )
-            row["송신 비고 / Source Remark"] = item.source_remark
-
-            # Keep the raw AI suggestion
-            row[
-                "AI 추천 대상 경로 / AI Suggested Target Path"
-            ] = item.target_path
-            row[
-                "AI 추천 대상 필드 / AI Suggested Target Field"
-            ] = item.target_field
-            row["신뢰도 / Confidence"] = item.confidence
-            row["AI 판단 근거 / AI Reason"] = item.reason
-
-            # Validate AI Target
-            target_record = (
-                target_by_path.get(item.target_path)
-                if item.target_path
-                else None
-            )
-
-            target_exists = (
-                target_record is not None
-                and target_record["Field"] == item.target_field
-            )
-
-            if target_exists:
-                row["AI 대상 존재 여부 / AI Target Exists"] = "YES"
-                row["최종 대상 경로 / Final Target Path"] = (
-                    item.target_path
-                )
-                row["최종 대상 필드 / Final Target Field"] = (
-                    item.target_field
-                )
-                row["수신 시스템 / Target System"] = item.target_system
-                row["수신 테이블 / Target Table"] = item.target_table
-                row["수신 PK / Target PK"] = item.target_pk
-                row["수신 타입 / Target Type"] = (
-                    item.target_type or target_record["Type"]
-                )
-                row["수신 사이즈 / Target Size"] = item.target_size
-                row["수신 설명 / Target Description"] = (
-                    item.target_description
-                )
-                row["수신 비고 / Target Remark"] = item.target_remark
-                row["매핑 상태 / Mapping Status"] = (
-                    "Mapped"
-                    if item.confidence >= 75
-                    else "Review Required"
-                )
-
-            else:
-                # AI suggestion is preserved, but Final Target stays blank
-                row["AI 대상 존재 여부 / AI Target Exists"] = "NO"
-                row["최종 대상 경로 / Final Target Path"] = ""
-                row["최종 대상 필드 / Final Target Field"] = ""
-                row["매핑 상태 / Mapping Status"] = "Unmapped"
-
-            mapping_rows.append(row)
+        mapping_rows = build_mapping_rows(
+            enriched_source_fields,
+            enriched_target_fields,
+            ai_mapping_dicts,
+        )
 
         st.session_state["mapping_df"] = pd.DataFrame(
             mapping_rows,
-            columns=MAPPING_COLUMNS,
+            columns=MAPPING_GRID_COLUMNS,
         )
 
+        # =========================
         # 4. Return Value
+        # =========================
         if ai.return_values:
             return_rows = []
 
             for seq, item in enumerate(ai.return_values, start=1):
-                return_rows.append({
-                    "송신 시스템 / Source System":
-                        item.source_system,
-                    "순번 / Seq.": seq,
-                    "송신 테이블 / Source Table":
-                        item.source_table,
-                    "송신 PK / Source PK":
-                        item.source_pk,
-                    "송신 필드명 / Source Field":
-                        item.source_field,
-                    "송신 타입 / Source Type":
-                        item.source_type,
-                    "송신 사이즈 / Source Size":
-                        item.source_size,
-                    "송신 설명 / Source Description":
-                        item.source_description,
-                    "송신 비고 / Source Remark":
-                        item.source_remark,
-                    "Mapping / Mapping": "<-",
-                    "수신 시스템 / Target System":
-                        item.target_system,
-                    "수신 테이블 / Target Table":
-                        item.target_table,
-                    "수신 PK / Target PK":
-                        item.target_pk,
-                    "수신 필드명 / Target Field":
-                        item.target_field,
-                    "수신 타입 / Target Type":
-                        item.target_type,
-                    "수신 사이즈 / Target Size":
-                        item.target_size,
-                    "수신 설명 / Target Description":
-                        item.target_description,
-                    "수신 비고 / Target Remark":
-                        item.target_remark,
-                })
+                return_rows.append(
+                    {
+                        "송신 시스템 / Source System":
+                            item.source_system,
+                        "순번 / Seq.": seq,
+                        "송신 테이블 / Source Table":
+                            item.source_table,
+                        "송신 PK / Source PK":
+                            item.source_pk,
+                        "송신 필드명 / Source Field":
+                            item.source_field,
+                        "송신 타입 / Source Type":
+                            item.source_type,
+                        "송신 사이즈 / Source Size":
+                            item.source_size,
+                        "송신 설명 / Source Description":
+                            item.source_description,
+                        "송신 비고 / Source Remark":
+                            item.source_remark,
+                        "Mapping / Mapping": "<-",
+                        "수신 시스템 / Target System":
+                            item.target_system,
+                        "수신 테이블 / Target Table":
+                            item.target_table,
+                        "수신 PK / Target PK":
+                            item.target_pk,
+                        "수신 필드명 / Target Field":
+                            item.target_field,
+                        "수신 타입 / Target Type":
+                            item.target_type,
+                        "수신 사이즈 / Target Size":
+                            item.target_size,
+                        "수신 설명 / Target Description":
+                            item.target_description,
+                        "수신 비고 / Target Remark":
+                            item.target_remark,
+                    }
+                )
 
             st.session_state["return_value_df"] = pd.DataFrame(
                 return_rows,
                 columns=RETURN_VALUE_COLUMNS,
             )
+        else:
+            st.session_state["return_value_df"] = build_return_df()
 
-        # Force editors to refresh with AI-filled values
+        # Force editors / grid to refresh with AI-filled values
         st.session_state["editor_version"] += 1
         st.rerun()
 
@@ -864,7 +796,9 @@ with left:
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
-        column_config=make_text_column_config(SOURCE_TRANSMISSION_UI_LABELS),
+        column_config=make_text_column_config(
+            SOURCE_TRANSMISSION_UI_LABELS
+        ),
         key=f"source_transmission_editor_{version}",
     )
     st.session_state["source_transmission_df"] = edited
@@ -876,7 +810,9 @@ with right:
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
-        column_config=make_text_column_config(TARGET_TRANSMISSION_UI_LABELS),
+        column_config=make_text_column_config(
+            TARGET_TRANSMISSION_UI_LABELS
+        ),
         key=f"target_transmission_editor_{version}",
     )
     st.session_state["target_transmission_df"] = edited
@@ -885,36 +821,17 @@ with right:
 # 3. Mapping Specification
 st.header("3. Mapping Specification")
 st.caption(
-    "AI suggestions and final reviewed values are kept separately."
+    "Edit the mapping if needed. "
+    "Status is generated automatically from the mapping result."
 )
 
-edited = st.data_editor(
+edited_mapping_df = render_mapping_grid(
     st.session_state["mapping_df"],
-    use_container_width=True,
-    hide_index=True,
-    num_rows="dynamic",
-    column_config={
-        **make_text_column_config(MAPPING_UI_LABELS),
-        "순번 / Seq.": st.column_config.NumberColumn("Seq."),
-        "신뢰도 / Confidence": st.column_config.NumberColumn(
-            "Confidence",
-            min_value=0,
-            max_value=100,
-        ),
-        "매핑 상태 / Mapping Status": st.column_config.SelectboxColumn(
-            "Mapping Status",
-            options=[
-                "Pending",
-                "Mapped",
-                "Review Required",
-                "Unmapped",
-                "Rejected",
-            ],
-        ),
-    },
-    key=f"mapping_editor_{version}",
+    height=420,
+    key=f"mapping_grid_{version}",
 )
-st.session_state["mapping_df"] = edited
+
+st.session_state["mapping_df"] = edited_mapping_df
 
 
 # 4. Return Value
@@ -931,4 +848,5 @@ edited = st.data_editor(
     },
     key=f"return_value_editor_{version}",
 )
+
 st.session_state["return_value_df"] = edited
