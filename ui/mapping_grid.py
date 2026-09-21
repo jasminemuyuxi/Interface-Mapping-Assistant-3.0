@@ -1,10 +1,9 @@
+import re
+
 import pandas as pd
 from st_aggrid import AgGrid, JsCode
 
 
-# =========================
-# Status cell style
-# =========================
 STATUS_CELL_STYLE = JsCode("""
 function(params) {
     if (params.value === 'Mapped') {
@@ -16,16 +15,10 @@ function(params) {
         };
     }
 
-    if (params.value === 'Source Only') {
-        return {
-            backgroundColor: '#FDE2E2',
-            color: '#B71C1C',
-            fontWeight: '700',
-            textAlign: 'center'
-        };
-    }
-
-    if (params.value === 'Target Only') {
+    if (
+        params.value === 'Source Only' ||
+        params.value === 'Target Only'
+    ) {
         return {
             backgroundColor: '#FDE2E2',
             color: '#B71C1C',
@@ -36,44 +29,102 @@ function(params) {
 
     if (params.value === 'Review Required') {
         return {
-            backgroundColor: '#FFF3CD',
-            color: '#856404',
+            backgroundColor: '#FFF4CC',
+            color: '#8A6D1D',
             fontWeight: '700',
             textAlign: 'center'
         };
     }
 
-    return {};
+    return {
+        textAlign: 'center'
+    };
 }
 """)
 
 
-# =========================
-# Column definitions
-# =========================
-COLUMN_DEFS = [
-    {
-        "headerName": "Source",
-        "headerClass": "main-group-header",
-        "children": [
+CUSTOM_CSS = {
+    ".main-group-header .ag-header-group-cell-label": {
+        "justify-content": "center",
+        "font-weight": "700",
+        "font-size": "18px",
+    },
+}
+
+
+def _build_hierarchy(path):
+    """
+    Convert a full Path into a readable parent hierarchy.
+
+    Examples:
+        Envelope.Body.Order.ConsigneeParty.InternalID
+        -> Envelope > Body > Order > ConsigneeParty
+
+        order.items[].product.code
+        -> order > items[] > product
+
+    If the path contains only the field itself, return "".
+    """
+    if path is None:
+        return ""
+
+    text = str(path).strip()
+
+    if not text:
+        return ""
+
+    parts = [
+        part.strip()
+        for part in re.split(r"\s*(?:\.|/|>)\s*", text)
+        if part.strip()
+    ]
+
+    if len(parts) <= 1:
+        return ""
+
+    return " > ".join(parts[:-1])
+
+
+def _build_column_defs(
+    show_source_hierarchy=False,
+    show_target_hierarchy=False,
+):
+    source_children = [
+        {
+            "headerName": "System",
+            "field": "source_system",
+            "editable": True,
+            "width": 120,
+        },
+        {
+            "headerName": "Seq.",
+            "field": "source_seq",
+            "editable": False,
+            "width": 80,
+        },
+    ]
+
+    if show_source_hierarchy:
+        source_children.append(
             {
-                "headerName": "System",
-                "field": "source_system",
-                "editable": True,
-                "width": 120,
-            },
-            {
-                "headerName": "Seq.",
-                "field": "source_seq",
+                "headerName": "Hierarchy",
+                "field": "source_hierarchy",
                 "editable": False,
-                "width": 80,
-            },
+                "width": 260,
+                "tooltipField": "source_hierarchy",
+            }
+        )
+
+    source_children.extend(
+        [
             {
                 "headerName": "Table",
                 "field": "source_table",
                 "editable": True,
                 "width": 130,
-                "headerTooltip": "Enter manually if table information is unavailable.",
+                "headerTooltip": (
+                    "Manual entry. Table name is not inferred automatically."
+                ),
             },
             {
                 "headerName": "PK",
@@ -104,58 +155,48 @@ COLUMN_DEFS = [
                 "field": "source_description",
                 "editable": True,
                 "width": 220,
+                "tooltipField": "source_description",
             },
             {
                 "headerName": "Remark",
                 "field": "source_remark",
                 "editable": True,
                 "width": 180,
-                "headerTooltip": "For manual remarks.",
+                "headerTooltip": "Manual entry.",
             },
-        ],
-    },
+        ]
+    )
 
-    # =========================
-    # Mapping
-    # =========================
-    {
-        "headerName": "",
-        "children": [
-            {
-                "headerName": "Mapping",
-                "field": "mapping",
-                "editable": False,
-                "width": 90,
-            },
-            {
-                "headerName": "Status",
-                "field": "mapping_status",
-                "editable": False,
-                "width": 130,
-                "cellStyle": STATUS_CELL_STYLE,
-            },
-        ],
-    },
+    target_children = [
+        {
+            "headerName": "System",
+            "field": "target_system",
+            "editable": True,
+            "width": 120,
+        },
+    ]
 
-    # =========================
-    # Target
-    # =========================
-    {
-        "headerName": "Target",
-        "headerClass": "main-group-header",
-        "children": [
+    if show_target_hierarchy:
+        target_children.append(
             {
-                "headerName": "System",
-                "field": "target_system",
-                "editable": True,
-                "width": 120,
-            },
+                "headerName": "Hierarchy",
+                "field": "target_hierarchy",
+                "editable": False,
+                "width": 260,
+                "tooltipField": "target_hierarchy",
+            }
+        )
+
+    target_children.extend(
+        [
             {
                 "headerName": "Table",
                 "field": "target_table",
                 "editable": True,
                 "width": 130,
-                "headerTooltip": "Enter manually if table information is unavailable.",
+                "headerTooltip": (
+                    "Manual entry. Table name is not inferred automatically."
+                ),
             },
             {
                 "headerName": "PK",
@@ -186,56 +227,97 @@ COLUMN_DEFS = [
                 "field": "target_description",
                 "editable": True,
                 "width": 220,
+                "tooltipField": "target_description",
             },
             {
                 "headerName": "Remark",
                 "field": "target_remark",
                 "editable": True,
                 "width": 180,
-                "headerTooltip": "For manual remarks.",
+                "headerTooltip": "Manual entry.",
             },
-        ],
-    },
-]
+        ]
+    )
+
+    return [
+        {
+            "headerName": "Source",
+            "headerClass": "main-group-header",
+            "children": source_children,
+        },
+        {
+            "headerName": "",
+            "children": [
+                {
+                    "headerName": "Mapping",
+                    "field": "mapping",
+                    "editable": False,
+                    "width": 100,
+                },
+                {
+                    "headerName": "Status",
+                    "field": "mapping_status",
+                    "editable": False,
+                    "width": 140,
+                    "cellStyle": STATUS_CELL_STYLE,
+                },
+            ],
+        },
+        {
+            "headerName": "Target",
+            "headerClass": "main-group-header",
+            "children": target_children,
+        },
+    ]
 
 
-# =========================
-# Custom CSS
-# =========================
-CUSTOM_CSS = {
-    ".main-group-header .ag-header-group-cell-label": {
-        "justify-content": "center",
-        "font-weight": "700",
-        "font-size": "18px",
-    },
-}
-
-
-# =========================
-# Render Mapping Grid
-# =========================
 def render_mapping_grid(
     mapping_df: pd.DataFrame,
     height: int = 420,
     key: str = "mapping_grid",
+    show_source_hierarchy: bool = False,
+    show_target_hierarchy: bool = False,
 ) -> pd.DataFrame:
     """
-    Render the Mapping Specification table.
+    Render the editable Mapping Specification grid.
 
-    Source:
-    System / Seq. / Table / PK / Field Name /
-    Type / Size / Description / Remark
-
-    Mapping:
-    Mapping / Status
-
-    Target:
-    System / Table / PK / Field Name /
-    Type / Size / Description / Remark
+    SOAP hierarchy is display-only:
+    - Source hierarchy is derived from source_path.
+    - Target hierarchy is derived from target_path.
+    - Temporary hierarchy columns are removed again before returning,
+      so the existing Mapping DataFrame / Excel export schema is unchanged.
     """
+    grid_df = mapping_df.copy()
+
+    temporary_columns = []
+
+    if show_source_hierarchy:
+        grid_df["source_hierarchy"] = (
+            grid_df.get(
+                "source_path",
+                pd.Series("", index=grid_df.index),
+            )
+            .fillna("")
+            .map(_build_hierarchy)
+        )
+        temporary_columns.append("source_hierarchy")
+
+    if show_target_hierarchy:
+        grid_df["target_hierarchy"] = (
+            grid_df.get(
+                "target_path",
+                pd.Series("", index=grid_df.index),
+            )
+            .fillna("")
+            .map(_build_hierarchy)
+        )
+        temporary_columns.append("target_hierarchy")
 
     grid_options = {
-        "columnDefs": COLUMN_DEFS,
+        "columnDefs": _build_column_defs(
+            show_source_hierarchy=show_source_hierarchy,
+            show_target_hierarchy=show_target_hierarchy,
+        ),
         "defaultColDef": {
             "resizable": True,
             "sortable": False,
@@ -244,10 +326,11 @@ def render_mapping_grid(
         "rowHeight": 42,
         "headerHeight": 42,
         "groupHeaderHeight": 42,
+        "tooltipShowDelay": 200,
     }
 
     response = AgGrid(
-        mapping_df,
+        grid_df,
         gridOptions=grid_options,
         height=height,
         fit_columns_on_grid_load=False,
@@ -257,9 +340,16 @@ def render_mapping_grid(
         key=key,
     )
 
-    edited_data = response["data"]
+    edited_df = pd.DataFrame(response["data"])
 
-    if isinstance(edited_data, pd.DataFrame):
-        return edited_data
+    # Hierarchy is display-only. Keep the original mapping schema intact.
+    edited_df = edited_df.drop(
+        columns=[
+            column
+            for column in temporary_columns
+            if column in edited_df.columns
+        ],
+        errors="ignore",
+    )
 
-    return pd.DataFrame(edited_data)
+    return edited_df

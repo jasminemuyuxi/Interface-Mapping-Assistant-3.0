@@ -1645,6 +1645,12 @@ edited_mapping_df = (
             f"mapping_grid_"
             f"{version}"
         ),
+        show_source_hierarchy=(
+            source_interface_type == "SOAP"
+        ),
+        show_target_hierarchy=(
+            target_interface_type == "SOAP"
+        ),
     )
 )
 
