@@ -53,18 +53,7 @@ CUSTOM_CSS = {
 
 
 def _build_hierarchy(path):
-    """
-    Convert a full Path into a readable parent hierarchy.
-
-    Examples:
-        Envelope.Body.Order.ConsigneeParty.InternalID
-        -> Envelope > Body > Order > ConsigneeParty
-
-        order.items[].product.code
-        -> order > items[] > product
-
-    If the path contains only the field itself, return "".
-    """
+    """Build parent hierarchy from a full internal Path."""
     if path is None:
         return ""
 
@@ -85,38 +74,55 @@ def _build_hierarchy(path):
     return " > ".join(parts[:-1])
 
 
-def _build_column_defs(
-    show_source_hierarchy=False,
-    show_target_hierarchy=False,
-):
-    source_children = [
-        {
-            "headerName": "System",
-            "field": "source_system",
-            "editable": True,
-            "width": 120,
-        },
-        {
-            "headerName": "Seq.",
-            "field": "source_seq",
-            "editable": False,
-            "width": 80,
-        },
-    ]
+def _ensure_hierarchy_columns(mapping_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Backward-compatible helper for older session_state DataFrames.
 
-    if show_source_hierarchy:
-        source_children.append(
-            {
-                "headerName": "Hierarchy",
-                "field": "source_hierarchy",
-                "editable": False,
-                "width": 260,
-                "tooltipField": "source_hierarchy",
-            }
+    New mappings persist Hierarchy directly. If an older DataFrame does not
+    have those columns yet, derive them once from source_path / target_path.
+    """
+    grid_df = mapping_df.copy()
+
+    if "source_hierarchy" not in grid_df.columns:
+        grid_df["source_hierarchy"] = (
+            grid_df.get(
+                "source_path",
+                pd.Series("", index=grid_df.index),
+            )
+            .fillna("")
+            .map(_build_hierarchy)
         )
 
-    source_children.extend(
-        [
+    if "target_hierarchy" not in grid_df.columns:
+        grid_df["target_hierarchy"] = (
+            grid_df.get(
+                "target_path",
+                pd.Series("", index=grid_df.index),
+            )
+            .fillna("")
+            .map(_build_hierarchy)
+        )
+
+    return grid_df
+
+
+COLUMN_DEFS = [
+    {
+        "headerName": "Source",
+        "headerClass": "main-group-header",
+        "children": [
+            {
+                "headerName": "System",
+                "field": "source_system",
+                "editable": True,
+                "width": 120,
+            },
+            {
+                "headerName": "Seq.",
+                "field": "source_seq",
+                "editable": False,
+                "width": 80,
+            },
             {
                 "headerName": "Table",
                 "field": "source_table",
@@ -131,6 +137,17 @@ def _build_column_defs(
                 "field": "source_pk",
                 "editable": True,
                 "width": 80,
+            },
+            {
+                "headerName": "Hierarchy",
+                "field": "source_hierarchy",
+                "editable": True,
+                "width": 260,
+                "tooltipField": "source_hierarchy",
+                "headerTooltip": (
+                    "Parent field hierarchy derived from Path. "
+                    "You can edit it before export."
+                ),
             },
             {
                 "headerName": "Field Name",
@@ -164,31 +181,36 @@ def _build_column_defs(
                 "width": 180,
                 "headerTooltip": "Manual entry.",
             },
-        ]
-    )
-
-    target_children = [
-        {
-            "headerName": "System",
-            "field": "target_system",
-            "editable": True,
-            "width": 120,
-        },
-    ]
-
-    if show_target_hierarchy:
-        target_children.append(
+        ],
+    },
+    {
+        "headerName": "",
+        "children": [
             {
-                "headerName": "Hierarchy",
-                "field": "target_hierarchy",
+                "headerName": "Mapping",
+                "field": "mapping",
                 "editable": False,
-                "width": 260,
-                "tooltipField": "target_hierarchy",
-            }
-        )
-
-    target_children.extend(
-        [
+                "width": 100,
+            },
+            {
+                "headerName": "Status",
+                "field": "mapping_status",
+                "editable": False,
+                "width": 140,
+                "cellStyle": STATUS_CELL_STYLE,
+            },
+        ],
+    },
+    {
+        "headerName": "Target",
+        "headerClass": "main-group-header",
+        "children": [
+            {
+                "headerName": "System",
+                "field": "target_system",
+                "editable": True,
+                "width": 120,
+            },
             {
                 "headerName": "Table",
                 "field": "target_table",
@@ -203,6 +225,17 @@ def _build_column_defs(
                 "field": "target_pk",
                 "editable": True,
                 "width": 80,
+            },
+            {
+                "headerName": "Hierarchy",
+                "field": "target_hierarchy",
+                "editable": True,
+                "width": 260,
+                "tooltipField": "target_hierarchy",
+                "headerTooltip": (
+                    "Parent field hierarchy derived from Path. "
+                    "You can edit it before export."
+                ),
             },
             {
                 "headerName": "Field Name",
@@ -236,88 +269,26 @@ def _build_column_defs(
                 "width": 180,
                 "headerTooltip": "Manual entry.",
             },
-        ]
-    )
-
-    return [
-        {
-            "headerName": "Source",
-            "headerClass": "main-group-header",
-            "children": source_children,
-        },
-        {
-            "headerName": "",
-            "children": [
-                {
-                    "headerName": "Mapping",
-                    "field": "mapping",
-                    "editable": False,
-                    "width": 100,
-                },
-                {
-                    "headerName": "Status",
-                    "field": "mapping_status",
-                    "editable": False,
-                    "width": 140,
-                    "cellStyle": STATUS_CELL_STYLE,
-                },
-            ],
-        },
-        {
-            "headerName": "Target",
-            "headerClass": "main-group-header",
-            "children": target_children,
-        },
-    ]
+        ],
+    },
+]
 
 
 def render_mapping_grid(
     mapping_df: pd.DataFrame,
     height: int = 420,
     key: str = "mapping_grid",
-    show_source_hierarchy: bool = False,
-    show_target_hierarchy: bool = False,
 ) -> pd.DataFrame:
     """
     Render the editable Mapping Specification grid.
 
-    SOAP hierarchy is display-only:
-    - Source hierarchy is derived from source_path.
-    - Target hierarchy is derived from target_path.
-    - Temporary hierarchy columns are removed again before returning,
-      so the existing Mapping DataFrame / Excel export schema is unchanged.
+    Hierarchy is now a normal persistent page value for every interface type.
+    Flat structures simply show a blank Hierarchy cell.
     """
-    grid_df = mapping_df.copy()
-
-    temporary_columns = []
-
-    if show_source_hierarchy:
-        grid_df["source_hierarchy"] = (
-            grid_df.get(
-                "source_path",
-                pd.Series("", index=grid_df.index),
-            )
-            .fillna("")
-            .map(_build_hierarchy)
-        )
-        temporary_columns.append("source_hierarchy")
-
-    if show_target_hierarchy:
-        grid_df["target_hierarchy"] = (
-            grid_df.get(
-                "target_path",
-                pd.Series("", index=grid_df.index),
-            )
-            .fillna("")
-            .map(_build_hierarchy)
-        )
-        temporary_columns.append("target_hierarchy")
+    grid_df = _ensure_hierarchy_columns(mapping_df)
 
     grid_options = {
-        "columnDefs": _build_column_defs(
-            show_source_hierarchy=show_source_hierarchy,
-            show_target_hierarchy=show_target_hierarchy,
-        ),
+        "columnDefs": COLUMN_DEFS,
         "defaultColDef": {
             "resizable": True,
             "sortable": False,
@@ -340,16 +311,4 @@ def render_mapping_grid(
         key=key,
     )
 
-    edited_df = pd.DataFrame(response["data"])
-
-    # Hierarchy is display-only. Keep the original mapping schema intact.
-    edited_df = edited_df.drop(
-        columns=[
-            column
-            for column in temporary_columns
-            if column in edited_df.columns
-        ],
-        errors="ignore",
-    )
-
-    return edited_df
+    return pd.DataFrame(response["data"])

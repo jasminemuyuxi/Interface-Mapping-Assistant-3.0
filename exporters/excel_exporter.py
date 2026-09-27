@@ -18,6 +18,7 @@ WHITE = "FFFFFF"
 BLACK = "000000"
 ARROW_BLUE = "2F55FF"
 LIGHT_GRAY = "F2F2F2"
+LIGHT_BLUE = "DDEBF7"
 
 FONT_NAME = "맑은 고딕"
 
@@ -37,6 +38,7 @@ SOURCE_EXPORT_COLUMNS = [
     "순번 / Seq.",
     "송신 테이블 / Source Table",
     "송신 PK / Source PK",
+    "송신 계층 / Source Hierarchy",
     "송신 필드명 / Source Field",
     "송신 타입 / Source Type",
     "송신 사이즈 / Source Size",
@@ -48,6 +50,7 @@ TARGET_EXPORT_COLUMNS = [
     "수신 시스템 / Target System",
     "수신 테이블 / Target Table",
     "수신 PK / Target PK",
+    "수신 계층 / Target Hierarchy",
     "최종 대상 필드 / Final Target Field",
     "수신 타입 / Target Type",
     "수신 사이즈 / Target Size",
@@ -60,6 +63,7 @@ RETURN_SOURCE_COLUMNS = [
     "순번 / Seq.",
     "송신 테이블 / Source Table",
     "송신 PK / Source PK",
+    "송신 계층 / Source Hierarchy",
     "송신 필드명 / Source Field",
     "송신 타입 / Source Type",
     "송신 사이즈 / Source Size",
@@ -71,6 +75,7 @@ RETURN_TARGET_COLUMNS = [
     "수신 시스템 / Target System",
     "수신 테이블 / Target Table",
     "수신 PK / Target PK",
+    "수신 계층 / Target Hierarchy",
     "수신 필드명 / Target Field",
     "수신 타입 / Target Type",
     "수신 사이즈 / Target Size",
@@ -115,6 +120,7 @@ LANGUAGE_TEXT = {
         "seq": "Seq.",
         "table": "Table",
         "pk": "PK",
+        "hierarchy": "Hierarchy",
         "field_name": "Field Name",
         "type": "Type",
         "size": "Size",
@@ -155,6 +161,7 @@ LANGUAGE_TEXT = {
         "seq": "순\n번",
         "table": "테이블",
         "pk": "PK",
+        "hierarchy": "계층",
         "field_name": "필드명",
         "type": "타입",
         "size": "사이\n즈",
@@ -291,13 +298,13 @@ def _merge_value(ws, cell_range: str, value: Any, *, horizontal: str = "left"):
 
 
 def _section_bar(ws, row: int, title: str):
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=18)
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=20)
     cell = ws.cell(row=row, column=1)
     cell.value = title
     cell.fill = PatternFill("solid", fgColor=DARK_BLUE)
     cell.font = Font(name=FONT_NAME, size=10, bold=True, color=WHITE)
     cell.alignment = Alignment(horizontal="center", vertical="center")
-    for col in range(1, 19):
+    for col in range(1, 21):
         ws.cell(row=row, column=col).fill = PatternFill("solid", fgColor=DARK_BLUE)
         ws.cell(row=row, column=col).border = THIN_BORDER
     ws.row_dimensions[row].height = 20
@@ -332,7 +339,7 @@ def _merge_consecutive(ws, col: int, start_row: int, end_row: int):
 
 
 def _apply_outer_border(ws, min_row: int, max_row: int,
-                        min_col: int = 1, max_col: int = 18):
+                        min_col: int = 1, max_col: int = 20):
     """Slightly emphasize the outer border of the used business form."""
     for col in range(min_col, max_col + 1):
         top = ws.cell(min_row, col)
@@ -402,12 +409,14 @@ def create_interface_mapping_excel(
     ws.title = text["sheet_name"]
     ws.sheet_view.showGridLines = False
 
-    # Column widths: A:R (18 columns)
+    # Column widths: A:T (20 columns)
+    # Hierarchy is a custom extension to the company template.
     widths = {
-        "A": 18, "B": 6, "C": 16, "D": 7, "E": 24, "F": 14,
-        "G": 9, "H": 25, "I": 20, "J": 11,
-        "K": 18, "L": 16, "M": 7, "N": 24, "O": 14,
-        "P": 9, "Q": 25, "R": 20,
+        "A": 18, "B": 6, "C": 16, "D": 7, "E": 32,
+        "F": 24, "G": 14, "H": 9, "I": 25, "J": 20,
+        "K": 11,
+        "L": 18, "M": 16, "N": 7, "O": 32, "P": 24,
+        "Q": 14, "R": 9, "S": 25, "T": 20,
     }
     for col, width in widths.items():
         ws.column_dimensions[col].width = width
@@ -415,7 +424,7 @@ def create_interface_mapping_excel(
     # ------------------------------------------------------------------
     # Title
     # ------------------------------------------------------------------
-    ws.merge_cells("A1:R1")
+    ws.merge_cells("A1:T1")
     _set_value(
         ws,
         "A1",
@@ -428,8 +437,8 @@ def create_interface_mapping_excel(
     ws.row_dimensions[2].height = 10
 
     # Blue separator like the screenshot
-    ws.merge_cells("A3:R3")
-    _style_range(ws, "A3:R3", fill=DARK_BLUE, border=THIN_BORDER)
+    ws.merge_cells("A3:T3")
+    _style_range(ws, "A3:T3", fill=DARK_BLUE, border=THIN_BORDER)
     ws.row_dimensions[3].height = 11
 
     # ------------------------------------------------------------------
@@ -445,7 +454,7 @@ def create_interface_mapping_excel(
     _merge_label(ws, "G4:H4", text["author"])
     _merge_value(
         ws,
-        "I4:R4",
+        "I4:T4",
         interface_info.get("작성자 / Author", ""),
     )
 
@@ -457,66 +466,66 @@ def create_interface_mapping_excel(
     _merge_label(ws, "A6:B6", text["interface_id"])
     _merge_value(ws, "C6:F6", interface_info.get("인터페이스 ID / Interface ID", ""))
     _merge_label(ws, "G6:H6", text["interface_name"])
-    _merge_value(ws, "I6:R6", interface_info.get("인터페이스 명 / Interface Name", ""))
+    _merge_value(ws, "I6:T6", interface_info.get("인터페이스 명 / Interface Name", ""))
 
     _merge_label(ws, "A7:B7", text["interface_pattern"])
     _merge_value(ws, "C7:F7", interface_info.get("인터페이스 패턴 / Interface Pattern", ""))
     _merge_label(ws, "G7:H7", text["schedule_driven"])
-    _merge_value(ws, "I7:L7", interface_info.get("스케줄 구동 / Schedule Driven", ""))
-    _merge_label(ws, "M7:N7", text["execution_cycle"])
-    _merge_value(ws, "O7:R7", interface_info.get("실행 주기 / Execution Cycle", ""))
+    _merge_value(ws, "I7:M7", interface_info.get("스케줄 구동 / Schedule Driven", ""))
+    _merge_label(ws, "N7:O7", text["execution_cycle"])
+    _merge_value(ws, "P7:T7", interface_info.get("실행 주기 / Execution Cycle", ""))
 
     _merge_label(ws, "A8:B8", text["max_records"])
     _merge_value(ws, "C8:F8", interface_info.get("최대 레코드(건) / Max Records", ""))
     _merge_label(ws, "G8:H8", text["average_records"])
-    _merge_value(ws, "I8:L8", interface_info.get("평균 레코드(건) / Average Records", ""))
-    _merge_label(ws, "M8:N8", text["split_count"])
-    _merge_value(ws, "O8:R8", interface_info.get("분할 건수 / Split Count", ""))
+    _merge_value(ws, "I8:M8", interface_info.get("평균 레코드(건) / Average Records", ""))
+    _merge_label(ws, "N8:O8", text["split_count"])
+    _merge_value(ws, "P8:T8", interface_info.get("분할 건수 / Split Count", ""))
 
     # ------------------------------------------------------------------
     # 2. Transmission Information
     # ------------------------------------------------------------------
     _section_bar(ws, 9, text["transmission_information"])
 
-    # Source side
+    # Source side: A:J
     _merge_label(ws, "A10:A17", text["source_side"])
     _merge_label(ws, "B10:C10", text["contact_name"])
     _merge_value(ws, "D10:E10", source_tx.get("담당자 명 / Contact Name", ""))
     _merge_label(ws, "F10:G10", text["department"])
-    _merge_value(ws, "H10:I10", source_tx.get("담당자 소속 / Department", ""))
+    _merge_value(ws, "H10:J10", source_tx.get("담당자 소속 / Department", ""))
 
     _merge_label(ws, "B11:C11", text["contact"])
-    _merge_value(ws, "D11:I11", source_tx.get("담당자 연락처 / Contact", ""))
+    _merge_value(ws, "D11:J11", source_tx.get("담당자 연락처 / Contact", ""))
     _merge_label(ws, "B12:C12", text["integration_technology"])
-    _merge_value(ws, "D12:I12", source_tx.get("연계 기술 / Integration Technology", ""))
+    _merge_value(ws, "D12:J12", source_tx.get("연계 기술 / Integration Technology", ""))
     _merge_label(ws, "B13:C13", text["source_server"])
-    _merge_value(ws, "D13:I13", source_tx.get("Source Svr / Source Server", ""))
+    _merge_value(ws, "D13:J13", source_tx.get("Source Svr / Source Server", ""))
     _merge_label(ws, "B14:C14", text["database"])
-    _merge_value(ws, "D14:I14", source_tx.get("DB / Database", ""))
+    _merge_value(ws, "D14:J14", source_tx.get("DB / Database", ""))
     _merge_label(ws, "B15:C15", text["adapter"])
-    _merge_value(ws, "D15:I15", source_tx.get("ADAPTER / Adapter", ""))
+    _merge_value(ws, "D15:J15", source_tx.get("ADAPTER / Adapter", ""))
     _merge_label(ws, "B16:C17", text["query_pattern"])
-    _merge_value(ws, "D16:I17", source_tx.get("조회 패턴 / Query Pattern", ""))
+    _merge_value(ws, "D16:J17", source_tx.get("조회 패턴 / Query Pattern", ""))
 
-    # Target side
-    _merge_label(ws, "J10:J17", text["target_side"])
-    _merge_label(ws, "K10:L10", text["contact_name"])
-    _merge_value(ws, "M10:N10", target_tx.get("담당자 명 / Contact Name", ""))
-    _merge_label(ws, "O10:P10", text["department"])
-    _merge_value(ws, "Q10:R10", target_tx.get("담당자 소속 / Department", ""))
+    # Target side: K:T
+    _merge_label(ws, "K10:K17", text["target_side"])
+    _merge_label(ws, "L10:M10", text["contact_name"])
+    _merge_value(ws, "N10:O10", target_tx.get("담당자 명 / Contact Name", ""))
+    _merge_label(ws, "P10:Q10", text["department"])
+    _merge_value(ws, "R10:T10", target_tx.get("담당자 소속 / Department", ""))
 
-    _merge_label(ws, "K11:L11", text["contact"])
-    _merge_value(ws, "M11:R11", target_tx.get("담당자 연락처 / Contact", ""))
-    _merge_label(ws, "K12:L12", text["integration_technology"])
-    _merge_value(ws, "M12:R12", target_tx.get("연계 기술 / Integration Technology", ""))
-    _merge_label(ws, "K13:L13", text["target_server"])
-    _merge_value(ws, "M13:R13", target_tx.get("Target Svr / Target Server", ""))
-    _merge_label(ws, "K14:L14", text["database"])
-    _merge_value(ws, "M14:R14", target_tx.get("DB / Database", ""))
-    _merge_label(ws, "K15:L15", text["adapter"])
-    _merge_value(ws, "M15:R15", target_tx.get("ADAPTER / Adapter", ""))
-    _merge_label(ws, "K16:L17", text["processing_pattern"])
-    _merge_value(ws, "M16:R17", target_tx.get("처리 패턴 / Processing Pattern", ""))
+    _merge_label(ws, "L11:M11", text["contact"])
+    _merge_value(ws, "N11:T11", target_tx.get("담당자 연락처 / Contact", ""))
+    _merge_label(ws, "L12:M12", text["integration_technology"])
+    _merge_value(ws, "N12:T12", target_tx.get("연계 기술 / Integration Technology", ""))
+    _merge_label(ws, "L13:M13", text["target_server"])
+    _merge_value(ws, "N13:T13", target_tx.get("Target Svr / Target Server", ""))
+    _merge_label(ws, "L14:M14", text["database"])
+    _merge_value(ws, "N14:T14", target_tx.get("DB / Database", ""))
+    _merge_label(ws, "L15:M15", text["adapter"])
+    _merge_value(ws, "N15:T15", target_tx.get("ADAPTER / Adapter", ""))
+    _merge_label(ws, "L16:M17", text["processing_pattern"])
+    _merge_value(ws, "N16:T17", target_tx.get("처리 패턴 / Processing Pattern", ""))
 
     for row in range(10, 18):
         ws.row_dimensions[row].height = 22
@@ -529,37 +538,47 @@ def create_interface_mapping_excel(
     _section_bar(ws, 18, text["mapping_specification"])
 
     # Group headers
-    ws.merge_cells("A19:I19")
+    ws.merge_cells("A19:J19")
     _set_value(ws, "A19", text["source_side"], bold=True, horizontal="center")
-    _style_range(ws, "A19:I19", fill=PALE_YELLOW, bold=True)
+    _style_range(ws, "A19:J19", fill=PALE_YELLOW, bold=True)
 
-    ws.merge_cells("J19:J20")
-    _set_value(ws, "J19", text["mapping"], bold=True, horizontal="center")
-    _style_range(ws, "J19:J20", fill=PALE_YELLOW, bold=True)
+    ws.merge_cells("K19:K20")
+    _set_value(ws, "K19", text["mapping"], bold=True, horizontal="center")
+    _style_range(ws, "K19:K20", fill=PALE_YELLOW, bold=True)
 
-    ws.merge_cells("K19:R19")
-    _set_value(ws, "K19", text["target_side"], bold=True, horizontal="center")
-    _style_range(ws, "K19:R19", fill=PALE_YELLOW, bold=True)
+    ws.merge_cells("L19:T19")
+    _set_value(ws, "L19", text["target_side"], bold=True, horizontal="center")
+    _style_range(ws, "L19:T19", fill=PALE_YELLOW, bold=True)
 
     headers = [
         text["system"], text["seq"], text["table"], text["pk"],
-        text["field_name"], text["type"], text["size"],
+        text["hierarchy"], text["field_name"], text["type"], text["size"],
         text["description"], text["remark"],
         text["mapping"],
-        text["system"], text["table"], text["pk"],
+        text["system"], text["table"], text["pk"], text["hierarchy"],
         text["field_name"], text["type"], text["size"],
         text["description"], text["remark"],
     ]
 
-    # J20 belongs to merged J19:J20, so skip it.
+    # K20 belongs to merged K19:K20, so skip it.
+    hierarchy_header_columns = {5, 15}
+
     for col, header in enumerate(headers, start=1):
-        if col == 10:
+        if col == 11:
             continue
+
         cell = ws.cell(row=20, column=col)
         cell.value = header
-        cell.fill = PatternFill("solid", fgColor=PALE_YELLOW)
+        cell.fill = PatternFill(
+            "solid",
+            fgColor=(LIGHT_BLUE if col in hierarchy_header_columns else PALE_YELLOW),
+        )
         cell.font = Font(name=FONT_NAME, size=10, bold=True, color=BLACK)
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            wrap_text=True,
+        )
         cell.border = THIN_BORDER
 
     ws.row_dimensions[19].height = 25
@@ -578,8 +597,8 @@ def create_interface_mapping_excel(
 
         # Prefer human-final target field. If the page is still using the older
         # field name, gracefully fall back to it for preview/testing.
-        if not target_values[3]:
-            target_values[3] = row_data.get("수신 필드명 / Target Field", "")
+        if not target_values[4]:
+            target_values[4] = row_data.get("수신 필드명 / Target Field", "")
 
         values = source_values + ["->"] + target_values
 
@@ -590,10 +609,14 @@ def create_interface_mapping_excel(
             cell.font = Font(
                 name=FONT_NAME,
                 size=9,
-                color=ARROW_BLUE if col == 10 else BLACK,
+                color=ARROW_BLUE if col == 11 else BLACK,
             )
             cell.alignment = Alignment(
-                horizontal="center" if col in (2, 4, 6, 7, 10, 13, 15, 16) else "left",
+                horizontal=(
+                    "center"
+                    if col in (2, 4, 7, 8, 11, 14, 17, 18)
+                    else "left"
+                ),
                 vertical="center",
                 wrap_text=True,
             )
@@ -604,7 +627,7 @@ def create_interface_mapping_excel(
 
     # Merge repeated System cells to mimic the screenshot.
     _merge_consecutive(ws, 1, data_start_row, mapping_end_row)
-    _merge_consecutive(ws, 11, data_start_row, mapping_end_row)
+    _merge_consecutive(ws, 12, data_start_row, mapping_end_row)
 
     # ------------------------------------------------------------------
     # 4. Return Value
@@ -614,7 +637,7 @@ def create_interface_mapping_excel(
         start_row=return_title_row,
         start_column=1,
         end_row=return_title_row,
-        end_column=18,
+        end_column=20,
     )
     _set_value(
         ws,
@@ -625,7 +648,7 @@ def create_interface_mapping_excel(
     )
     _style_range(
         ws,
-        f"A{return_title_row}:R{return_title_row}",
+        f"A{return_title_row}:T{return_title_row}",
         fill=PALE_YELLOW,
         bold=True,
         horizontal="left",
@@ -650,10 +673,10 @@ def create_interface_mapping_excel(
             cell.font = Font(
                 name=FONT_NAME,
                 size=9,
-                color=ARROW_BLUE if col == 10 else BLACK,
+                color=ARROW_BLUE if col == 11 else BLACK,
             )
             cell.alignment = Alignment(
-                horizontal="center" if col in (2, 4, 6, 7, 10, 13, 15, 16) else "left",
+                horizontal="center" if col in (2, 4, 7, 8, 11, 14, 17, 18) else "left",
                 vertical="center",
                 wrap_text=True,
             )
@@ -665,7 +688,7 @@ def create_interface_mapping_excel(
     # Print / page setup
     # ------------------------------------------------------------------
     ws.freeze_panes = None
-    ws.print_area = f"A1:R{final_row}"
+    ws.print_area = f"A1:T{final_row}"
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
