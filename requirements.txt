@@ -1,19 +1,39 @@
-anthropic # call Claude API
-streamlit # 做你的前端网页
-python-dotenv #安全读取API Key  
-pydantic # 规定Claude必须输出固定Mapping结构
-pandas # 处理Mapping表  
-openpyxl # 成Excel 
-rapidfuzz # 字段名称相似度 
-pyyaml # 后续读取OpenAPI YAML 
 
-# """| Library       | 作用                      |
-# | ------------- | ----------------------- |
-# | anthropic     | 调用Claude API            |
-# | streamlit     | 做你的前端网页                 |
-# | python-dotenv | 安全读取API Key             |
-# | pydantic      | 规定Claude必须输出固定Mapping结构 |
-# | pandas        | 处理Mapping表              |
-# | openpyxl      | 生成Excel                 |
-# | rapidfuzz     | 字段名称相似度                 |
-# | pyyaml        | 后续读取OpenAPI YAML        |
+# AI integration: Call the Anthropic Claude API for semantic field mapping.
+anthropic
+
+# Web application: Build the user interface with Streamlit.
+streamlit
+
+# Environment configuration: Load API keys and settings from .env files.
+python-dotenv
+
+# Data validation: Define and validate structured AI mapping responses.
+pydantic
+
+# Data processing: Manage and transform mapping data in DataFrames.
+pandas
+
+# Excel processing: Read and generate Excel mapping documents.
+openpyxl
+
+# Fuzzy matching: Calculate similarity between field names.
+rapidfuzz
+
+# YAML parsing: Support OpenAPI specifications in YAML format.
+pyyaml
+
+# Interactive grid: Display, edit, filter, and select mapping records.
+streamlit-aggrid==1.2.1.post2
+
+# Database ORM: Manage mapping records and relationships using SQLAlchemy.
+sqlalchemy>=2.0,<3.0
+
+# Database migrations: Track and apply database schema changes.
+alembic>=1.16,<2.0
+
+# PostgreSQL driver: Connect the Python application to PostgreSQL.
+psycopg[binary]>=3.2,<4.0
+
+# Automated testing: Validate database operations and business logic.
+pytest>=8.0,<10.0
