@@ -1,0 +1,28 @@
+Alembic migration foundation
+============================
+
+The shared metadata is db.base.Base.metadata. The environment explicitly
+imports models.customer to register the Customer model. Register future ORM
+modules explicitly before using their tables in migration comparisons.
+
+Offline mode uses a credential-free postgresql+psycopg dialect URL. It does
+not import db.database, load .env, or connect to a database. Online mode
+imports the application's shared engine only inside run_migrations_online.
+Do not place credentials in alembic.ini or add connection URL/parameter logs.
+
+Safe offline checks from the project root (PowerShell):
+    .\.venv\Scripts\python.exe -B -m alembic history
+    .\.venv\Scripts\python.exe -B -m alembic heads
+    .\.venv\Scripts\python.exe -B -m alembic upgrade head --sql
+
+Verified offline on 2026-10-31 using the project virtual environment:
+history and heads exited successfully with no revisions. Offline upgrade
+exited successfully and emitted only BEGIN and COMMIT, with no table DDL.
+An in-process environment check confirmed that target_metadata is the shared
+Base.metadata and contains customers; db.database and dotenv were not imported.
+Importing models does not generate migration operations.
+
+No revisions are included in this foundation. Revision creation and online
+database operations require a separately approved development task. Offline
+checks do not validate database connectivity, permissions, existing tables,
+applied revisions, or actual constraint behavior.

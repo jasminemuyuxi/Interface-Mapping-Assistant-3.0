@@ -2679,6 +2679,107 @@ def _workspace_has_unsaved_changes():
 
 
 
+def _handle_registry_navigation_request():
+    """Evaluate managed navigation after the editable workspace is updated."""
+    if not st.session_state.get("app_nav_managed", False):
+        return
+
+    request = st.session_state.get("app_nav_registry_request")
+    if request is None:
+        return
+    if request not in {"requested", "confirm"}:
+        st.session_state.pop("app_nav_registry_request", None)
+        return
+
+    # Existing project operations take priority over a navigation request.
+    if any(
+        st.session_state.get(key)
+        for key in (
+            "pending_workspace_action",
+            "project_save_requested",
+            "unsaved_guard_visible",
+            "pending_guard_action",
+            "after_save_guard_action",
+            "generate_mapping_requested",
+            "project_rename_mode",
+            "project_delete_mode",
+            "project_new_mode",
+            "project_load_confirm_mode",
+            "pending_load_project_id",
+            "load_after_save_project_id",
+        )
+    ):
+        st.session_state.pop("app_nav_registry_request", None)
+        with st.sidebar:
+            st.info(
+                "Navigation was cancelled because a project operation is pending. "
+                "Complete that operation, then request navigation again."
+            )
+        return
+
+    has_uploads = any(
+        st.session_state.get(key)
+        for key in (
+            "source_structure_file",
+            "target_structure_file",
+            "source_reference_files",
+            "target_reference_files",
+        )
+    )
+    has_unsaved_changes = _workspace_has_unsaved_changes()
+
+    # New mappings can contain manual edits without any field names yet.
+    if not str(st.session_state.get("current_project_id") or "").strip():
+        mapping_df = st.session_state.get("mapping_df")
+        if isinstance(mapping_df, pd.DataFrame) and not mapping_df.empty:
+            business_columns = [
+                column
+                for column in mapping_df.columns
+                if column.startswith(("source_", "target_"))
+                and column != "source_seq"
+            ]
+            business_values = (
+                mapping_df[business_columns]
+                .fillna("")
+                .astype(str)
+                .apply(lambda column: column.str.strip())
+            )
+            has_unsaved_changes = (
+                has_unsaved_changes or business_values.ne("").any().any()
+            )
+
+    if not has_uploads and not has_unsaved_changes:
+        st.session_state["app_nav_registry_request"] = "approved"
+        return
+
+    st.session_state["app_nav_registry_request"] = "confirm"
+    with st.sidebar:
+        confirmation = st.empty()
+        with confirmation.container():
+            st.warning(
+                "Leaving AI Workspace does not save your changes. "
+                "Unsaved edits may be lost. Uploaded files may not be "
+                "restored when you return."
+            )
+            continue_navigation = st.button(
+                "Continue to Registry",
+                key="app_nav_confirm_registry",
+                width="stretch",
+            )
+            cancel_navigation = st.button(
+                "Cancel",
+                key="app_nav_cancel_registry",
+                width="stretch",
+            )
+
+        if cancel_navigation:
+            st.session_state.pop("app_nav_registry_request", None)
+            confirmation.empty()
+        elif continue_navigation:
+            st.session_state["app_nav_registry_request"] = "approved"
+            confirmation.empty()
+
+
 GUARD_ACTION_NEW_PROJECT = "NEW_PROJECT"
 GUARD_ACTION_LOAD_PROJECT = "LOAD_PROJECT"
 GUARD_ACTION_DELETE_PROJECT = "DELETE_PROJECT"
@@ -2693,6 +2794,7 @@ def _queue_workspace_action(action, payload=None):
     before lower-page editors. The action is evaluated at the bottom of the
     page after all editable widgets have synchronized their latest values.
     """
+    st.session_state.pop("app_nav_registry_request", None)
     st.session_state["pending_workspace_action"] = action
     st.session_state["pending_workspace_payload"] = dict(payload or {})
 
@@ -2784,6 +2886,7 @@ def _clear_active_workspace():
     Clear the currently open work area.
     Saved Project files on disk are not affected.
     """
+    st.session_state.pop("app_nav_registry_request", None)
     for widget_key in [
         "source_structure_file",
         "target_structure_file",
@@ -2823,6 +2926,7 @@ def _restore_project_workspace(project_data):
     Restore all persisted editable page values from one saved Project.
     Uploaded file binaries are intentionally not restored in Phase 1.
     """
+    st.session_state.pop("app_nav_registry_request", None)
     metadata = dict(project_data.get("metadata") or {})
     workspace = dict(project_data.get("workspace") or {})
 
@@ -5323,6 +5427,9 @@ st.session_state[
 # tables (especially Mapping Result) are rendered later. Therefore destructive
 # actions must be evaluated only here, after all current edits have been
 # synchronized into st.session_state.
+# This checks Python-side values; it does not acknowledge browser Grid delivery.
+_handle_registry_navigation_request()
+
 pending_workspace_action = st.session_state.get(
     "pending_workspace_action",
     "",
