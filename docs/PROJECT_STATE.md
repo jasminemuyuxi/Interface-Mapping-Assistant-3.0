@@ -1,171 +1,99 @@
-﻿# Interface Mapping Assistant 3.0 — Project State
+# Interface Mapping Assistant 3.0 - Project State
 
-Last Updated: 2026-11-02
+Last Updated: 2026-11-09
 
-## 1. Project Context and Stack
+## 1. Current status and evidence boundary
 
-- Independent 3.0 internal logistics IT PoC; keep separate from Interface Mapping Assistant 2.0.
-- Local Windows + VS Code environment with a project Python virtual environment.
-- Stack: Python, Streamlit + AG Grid, PostgreSQL, SQLAlchemy, Alembic, Psycopg, Anthropic Claude API; Git/GitHub and DBeaver support development.
-- Verified target in the reported 2026-10-31 database inspection: PostgreSQL 17.11, UTF8, database `interface_mapping_management`, application role `mapping_app`, schema `public`.
+Phase one, actual-state reconciliation and core business relationship design closure, is complete within the confirmed scope. Module order: UI001 + UI005 -> UI002 -> UI004 -> UI003. Internal-standard creation-service work remains deferred. Full authentication, services and pages are later implementation, not phase-one blockers.
 
-## 2. Current Priority and Design Decisions
+Customer creation and six internal-standard structures exist. CustomerInterface has a six-field ORM model, seven offline checks, explicit Alembic registration and prepared migration 4b8e2f6a91d3. **customer_interfaces has not been created in the inspected local database. Do not apply this migration unchanged: its default-locale lower(interface_code) uniqueness has an observed Unicode gap.**
 
-- Prioritize Mapping Registry. Further AI Workspace improvements are deferred.
-- Current phase: implement master data, interface definitions, and segment mappings in batches; save and query one OMS → WMS internal standard using anonymous sample data.
-- Maintain internal standards by segment: initially EDI—OMS and OMS—WMS. The structure must support future OMS—TMS segments and branching interface chains.
-- Manage interface definitions, interface relationships, and field mappings. Actual interface execution, scheduling, and runtime monitoring are outside scope.
-- Separate corrections to shared standards from customer-specific adjustments.
-- Customer configurations reference explicit standard versions; standard upgrades must not automatically overwrite customer configurations.
-- Multiple customer interfaces may reuse the same EDI interface and fields, while maintaining their own data scopes and trigger conditions.
-- Preserve original interface identifiers as documented, including cross-system interface identifiers. Do not invent separate sender/receiver identifiers when they are not provided. Manage transmission information for both sides at the version level.
-- Detailed structures for all tables are not finalized. The Customer model is implemented; subsequent table designs remain open.
+Evidence categories below separate historical reports, earlier actual read-only inspections, today's offline closeout checks, and future work. No database connection, experiment, migration, application execution or dependency installation occurred during this Git closeout. Credentials, customer business data, workspace JSON and Chinese development logs are excluded. The user explicitly authorized the closeout Commit and ordinary Push; actual hash/result will be reported in chat without a follow-up commit to insert the hash here.
 
-## 3. Confirmed Customer Model
+## 2. Actual database state verified earlier on 2026-11-09
 
-- One customer profile represents one business country or region; `country_code` is stored directly in `customers`.
-- English name is required; local-language name is optional. Names are not restricted to ASCII.
-- Customer names may repeat; `customer_code` is unique. Contracting entity names are not unique.
-- Do not add customer-country association, business-scope, or project tables at this stage.
-- Future customer copying will create independent drafts of customer-specific interfaces and mappings. Shared standards remain reused through explicit version references. Customer copying is not implemented.
-- Exact fields and constraints are defined by `models/customer.py`. The country code check validates format only, not actual country-code membership.
-- The single-customer creation service trims optional text and converts blank input to NULL; its verification scope is recorded in Section 6.
+These are the completed read-only inspections from earlier tasks, not rerun in this closeout. Transactions were explicitly read-only, rolled back, connections closed and pools disposed. Queries inspected catalogs, alembic_version and anonymous expressions, not customer business rows. No temporary objects, DDL/DML or sequence-changing calls were used.
 
-## 4. Historical Setup and Database Runtime Verification
+- Local PoC: interface_mapping_management, role mapping_app, PostgreSQL 17.11, UTF8, schema public, search_path "$user", public.
+- Applied revision: exactly c93a7d125e60. Current source chain: base -> 7f6ed0bcb03c -> c93a7d125e60 -> 4b8e2f6a91d3, one source head. Source head does not imply applied revision.
+- Schema USAGE/CREATE, Customer REFERENCES and version-table UPDATE prerequisites were present. Customer and alembic_version were owned by mapping_app. No proposed customer-interface table/index/constraint/Identity-sequence name collision was found. Recheck before any eventual schema change.
 
-The following records are retained from earlier development; they are not current database inspection results.
+| Existing business table | Model | Structural evidence |
+| --- | --- | --- |
+| customers | models/customer.py | Revision 7f6ed0bcb03c; 10 columns, PK, UQ, 4 Checks, country index. |
+| systems | models/system.py | Revision c93a7d125e60; 7 columns, PK, UQ, 3 Checks. |
+| standard_interfaces | models/standard_interface.py | Same revision; 9 columns, PK, UQ, 2 system FKs, 4 Checks, 2 lookup indexes. |
+| standard_interface_versions | models/standard_interface_version.py | Same revision; 12 columns, PK, interface/version UQ, FK, 4 Checks. |
+| standard_mapping_records | models/standard_mapping_record.py | Same revision; 10 columns, PK, 2 version UQs, FK, 3 Checks. |
+| standard_mapping_fields | models/standard_mapping_field.py | Same revision; 16 columns, PK, record/side/order UQ, FK, 4 Checks. |
+| standard_mapping_rules | models/standard_mapping_rule.py | Same revision; 9 columns, PK, record/order UQ, FK, 3 Checks. |
 
-- Independent repository, Python virtual environment, and application dependencies were prepared; the existing Streamlit application was launched successfully.
-- PostgreSQL and DBeaver connectivity, database and application-role creation, application-role login, and public-schema CREATE permission were historically verified.
-- `.env` was recorded as ignored by Git and untracked; this was not rechecked in this documentation update.
-- Steps 10.14 and 10.15: the user confirmed shared Engine and SessionLocal connectivity on 2026-10-25 using `python db_connection_test.py`. The test used `SELECT current_database(), current_user` and reported the expected database and role. Codex did not rerun it during this update.
-- Steps 11.9.1–11.9.4: the user manually verified startup with `python -m streamlit run streamlit_app.py`, Registry as the default page, and basic navigation on 2026-10-25. These checks covered the navigation foundation only.
+The seven tables matched current model and migration definitions: 73 columns/types/lengths/nullability, Identity presence/mode, defaults, 7 PKs, 8 UQs, 6 RESTRICT FKs, 25 Check expressions and 3 explicit indexes. Check deparsing casts/IN-to-ANY rewrites were semantically reviewed. No user-defined triggers or invalid/unready indexes were found. Applied migration definitions were reconstructed in memory for comparison without executing them against the database. This is structural verification, not current data-quality, rejection, concurrency, seed-content or ORM-onupdate behavior testing.
 
-## 5. User Manual Verification — 2026-10-31
+## 3. Implemented source and persistence boundaries
 
-These results were supplied by the user in conversation; they were not independently executed by Codex.
+- db/base.py supplies shared Base and constraint naming. db/database.py supplies Engine/SessionLocal (autoflush=False, expire_on_commit=False). Customer creation service validates and add/flushes in a caller-owned Session; Registry submission owns commit/rollback/close. Returning an ORM object does not prove commit success.
+- Customer customer_code uses the existing ASCII-uppercase rules; that is a different identifier from Unicode customer-interface codes. Customer names may repeat; country validation checks format only. No current requirement justifies rewriting the existing Customer or shared standard tables.
+- streamlit_app.py and app.py provide Registry/AI navigation and scoped unsaved-work protection. services/project_service.py saves AI Workspace JSON files; this is not database-backed customer Mapping.
+- models/customer_interface.py uses the shared Base and exactly customer_interface_id, customer_id, interface_code, interface_name, created_at, updated_at. BIGINT Identity, NOT NULL customer FK/RESTRICT and lookup index, VARCHAR(100)/VARCHAR(200), two nonblank Checks, TIMESTAMPTZ/default now()/ORM updated_at onupdate, global unique lower-code expression index. No name UQ, status, purpose, routes, user FK or audit columns.
+- alembic/env.py registers CustomerInterface and all required existing models. Prepared revision: alembic/versions/4b8e2f6a91d3_create_customer_interfaces.py, down_revision c93a7d125e60. Upgrade contains only the new table/constraints/two indexes plus normal version bookkeeping. Downgrade removes its indexes then table. No timestamp trigger is defined.
+- Customer-interface services, route/node models, customer Mapping/member/transformation/history storage, role enforcement and account/session revocation remain unimplemented. Trimming, ACTIVE-customer eligibility and permissions are not provided by the model's FK or Checks. Existing standard publication-state Checks do not implement freezing, version allocation or copying.
 
-- Bidirectional Registry ↔ AI Workspace navigation worked with an empty workspace.
-- Returning from an empty workspace required no confirmation and caused no error, blank page, or repeated navigation.
-- An unsaved Remark produced the departure warning and Continue / Cancel controls.
-- Cancel retained the workspace and Remark and removed the confirmation prompt.
-- Continue opened Registry successfully.
-- Reopening AI Workspace caused no unexpected navigation or stale confirmation; the Remark remained in this particular test.
-- Leaving again required confirmation; the previous Continue approval was not reused.
-- The user subsequently confirmed that saving the Mapping succeeded.
+## 4. Confirmed core business rules and design
 
-These are limited scenario results, not complete workspace-state preservation or overall acceptance. They do not establish database-backed persistence.
+Authority is the user's explicit confirmations, not draft labels. See docs/architecture/CUSTOMER_INTERFACE_DESIGN.md for detailed recommendations.
 
-The controlled navigation implementation in `streamlit_app.py` and `app.py` uses requested/confirm/one-time-approved states. It supersedes the earlier one-way navigation restriction. Confirmation does not automatically save data or guarantee restoration after departure.
+- Customer -> Customer Interface -> Route. Interfaces can register/save independently with zero routes; one interface may later own multiple routes. Route owns Nodes and Mappings; Mapping Members belong to a Mapping and a node on the same Route. Recommend composite route_id/mapping_id and route_id/node_id FKs with parent UQs to prevent cross-route references.
+- Route names are case-insensitively unique within an interface; different interfaces may share names. JSON field paths such as item[].sku are unrelated labels and have no global UQ.
+- Per PoC route, each internal system occurs at most once and Customer occurs at most once. Branches are independent routes with isolated Mapping. Recommend a separate CUSTOMER node kind with NULL system_id, versus SYSTEM nodes referencing systems; do not add a CUSTOMER system seed.
+- Renaming preserves route ID and Mapping ownership. Node/direction changes check Mapping impact; conflicts reject the entire save, retaining the draft without silent deletion/reassignment/semantic changes. Detailed conflict tests are technical recommendations, including referenced-node changes, invalidated conversion dependencies and stale revisions.
+- Interface code: required, trimmed, <=100 characters, original case/Unicode/common symbols retained; globally case-insensitive unique. Name: required, trimmed, Unicode, <=200 characters and repeatable. Only interface-name maintenance is in scope; no code editing, customer reassignment, deletion or status/purpose expansion.
+- Customer Mapping requires a registered interface owned by its customer and a route within it. Only concrete internal-interface references may be NULL; PoC maintains system nodes/order/direction. Customer Mapping is private, separate from shared standard details; optional future provenance may reference an explicit standard version without allowing customer edits to overwrite standards.
+- Inactive business customers remain queryable by authorized active accounts, but block new interfaces, interface-name edits, Mapping additions/changes and Route/Flow changes. Inactive accounts cannot log in or continue any business query/write through existing sessions. ADMIN maintains business data; active USER is business-read-only.
+- UI001 Mapping must show last modifier and actor/time/record/field/before/after history. Trusted identity and atomic history persistence are later physical-design dependencies, not optional requirements. Interface/other master-data full-history scope remains separately pending. Do not invent user FKs or treat timestamps as full audit.
+- Route/node/Mapping deletion, customer copying, SSO, self-registration and approval/publication are not authorized in this stage.
 
-No passing results were supplied in this round for uploaded files, conflicting operations, AG Grid final-cell synchronization, filtered-row completeness, standalone `app.py` startup, or Ctrl+S behavior. These remain pending. Uploaded-file restoration, automatic saving, browser-level departure protection, and cross-session recovery are not implemented by the navigation changes. Further AI Workspace work is currently deferred.
+Formal UI001 V04/UI005 V03 files remain missing locally; no formal-file synchronization is claimed. No independent Claude Code conclusions have been received or adopted. Missing formal-file traceability and that review are disclosed limits, not invented approvals or blockers to the explicitly confirmed relationship closure.
 
-## 6. Customer Database Implementation and Verification — 2026-10-31
+## 5. Unicode findings and migration gate
 
-The results below are recorded from local Codex execution reports supplied by the user. They were not rerun during this documentation update. Earlier source reviews covered Base, database configuration, Customer, and Alembic. This update inspected `services/customer_service.py` and `models/customer.py` and found no discrepancy with the reports. Offline checks, database runtime tests, and user manual checks are separate evidence.
+Completed earlier read-only observations, not rerun during closeout:
 
-### ORM and Offline Verification
+- Database LC_COLLATE/LC_CTYPE: Korean_Korea.949, libc provider; default collation deterministic. Database collation-version fields returned NULL. Current code/index has no explicit COLLATE and would inherit this environment.
+- Default lower merges observed ASCII and mixed Korean/API case, but misses sharp S/capital sharp S (U+00DF/U+1E9E). Capital/ordinary sigma matches; final/ordinary sigma does not. Turkish dotted/dotless I boundaries were recorded. These expressions do not redefine business equivalence.
+- Catalog found 784 ICU collations and no existing nondeterministic collation. Existing deterministic pg_catalog.und-x-icu stored/actual version 153.14 matched. Explicit ICU lower merges sharp-S capitalization and accented case, but still does not merge final/ordinary sigma. It preserves tested sharp-S/SS, accent, fullwidth/ASCII, composed/decomposed and slash/hyphen distinctions. Dotted-I lower becomes i plus combining dot, distinct from i.
+- Preferred candidate: dedicated index-local ICU nondeterministic case-insensitive/accent-sensitive root comparison, und-u-ks-level2, preserving original display text and deterministic column Checks. This is an unvalidated recommendation. Added normalization/width/punctuation/expansion equivalences require explicit assessment; only acceptance-changing ambiguous business outcomes need user decisions.
+- **Candidate-collation isolated creation/rollback experiment: pending, never executed.** Only existing-collation SELECT expressions have actual results. No candidate collation, real unique-index duplicate rejection or concurrency validation exists. Do not replace the gap with an unverified claim about citext or Python casefold.
 
-- `db/base.py` defines the unified SQLAlchemy 2.x `DeclarativeBase` and naming conventions for indexes, unique constraints, checks, foreign keys, and primary keys. Check constraints require explicit semantic names.
-- Import and in-memory metadata checks passed. Metadata was empty when Base was imported without model registration.
-- The module does not import `db.database`, load `.env`, or connect to the database.
-- `models/customer.py` defines the typed Customer ORM model using the shared Base, without changing `models/interface_package.py` or the empty `models/__init__.py`.
-- Offline checks of field types, nullability, Identity, defaults, constraints, indexes, and PostgreSQL SQL compilation passed.
+## 6. Historical verification retained
 
-### Alembic and Initial Migration
+These scoped reports are historical; the closeout does not rerun them. Local Git version baed0ef:docs/PROJECT_STATE.md (dated 2026-11-02) and the earlier 2026-11-04 snapshot read in this conversation provide provenance; original standalone execution logs were not located.
 
-- Alembic is initialized. `target_metadata` uses `db.base.Base.metadata`; `models.customer` is explicitly imported to register Customer.
-- Offline mode uses a credential-free `postgresql+psycopg` dialect configuration without importing `db.database`, loading `.env`, or opening a connection.
-- Online mode imports and reuses the shared Engine inside the online migration function; this path has now executed successfully.
-- No real connection string or credentials are stored in `alembic.ini`; no connection URL or sensitive-parameter logging is configured.
-- Initial revision `7f6ed0bcb03c` in `alembic/versions/7f6ed0bcb03c_create_customers_table.py` has `down_revision = None` and was generated without autogenerate, then manually implemented.
-- History and heads checks confirmed one initial revision and one head. Offline upgrade SQL matched the Customer model's fields, constraints, and index; checks exited with code 0. Alembic version-management SQL was distinguished from customer-table SQL.
-- Offline environment verification confirmed that `env.py` actually passed shared Base metadata containing `customers`, without importing `db.database` or `dotenv`.
+- User reported shared Engine/SessionLocal connectivity and startup/default Registry/basic navigation on 2026-10-25; limited empty-workspace/Remark/departure/save behavior on 2026-10-31. AI save feedback was not database customer-Mapping evidence.
+- Customer migration/structure and 22 rollback-only database cases, ORM onupdate/raw-SQL distinction, 96 offline service checks and rollback-only integration were reported passing. Failure SAVEPOINT recovery and exact cleanup were checked; no test commits or sequence resets. Page reports recorded 15 stub cases plus AppTest with database substitutes. Later user feedback confirmed one page-created record externally; no customer identifiers are reproduced. Duplicate-code manual acceptance had no explicit result.
+- Six-standard-table migration/structure/offline checks and separate rollback-only behavior rounds were reported. Initial 18 normal/35 rejection cases preceded a test assertion failure over overlapping Checks; targeted diagnosis and supplemental 89 rejection/2 normal plus 3 rejection/3 recovery publication-time cases passed. This was not one uninterrupted suite and did not implement standard business submission, allocation/copying/freezing.
+- CustomerInterface model task recorded 7 passed in 0.76s after pytest default capture initially failed before collection because the read-only sandbox lacked writable temporary files. sys capture resolved it without installation. Migration preparation reran 7 checks in 0.54s and guarded offline registration/upgrade/downgrade comparisons passed. No customer-interface database migration was executed.
+- Earlier saved-state regression from a newer snapshot to 2026-10-24 was reconciled using source/history; cause remains unknown. Downloads copies were not merged or overwritten. Main progress file is the AGENTS-designated docs/PROJECT_STATE.md.
 
-### Database Inspection and Applied Structure
+Unverified: actual interface migration execution/rollback, unique-index and concurrent behavior, candidate Unicode equivalences, database timestamp behavior for the new model, real Customer commit-failure/concurrent/cross-tab paths, full AI upload/Grid/shortcut/navigation regression, standard downgrade/business submission and original test artifacts. Complete login/services/pages are not phase-one blockers.
 
-- Shared-Engine inspection confirmed PostgreSQL 17.11, UTF8, database `interface_mapping_management`, role `mapping_app`, and `public` as the actual default target schema with USAGE and CREATE privileges.
-- The initial inspection found no non-system ordinary or partitioned tables and no `customers`, `alembic_version`, or other same-name relation objects. Inspection used a read-only transaction, which was rolled back before releasing the connection.
-- Migration prerequisites were rechecked before application. `.\.venv\Scripts\python.exe -B -m alembic upgrade 7f6ed0bcb03c` exited with code 0.
-- Read-only post-migration checks confirmed `public.customers`, `public.alembic_version`, and recorded version `7f6ed0bcb03c`.
-- All ten customer columns, types, nullability, Identity, database defaults, primary key, unique constraint, four Check constraints, and the `country_code` index matched the migration. The Identity sequence and constraint-backed indexes were present; no user-defined triggers existed.
-- Post-migration inspection transactions were rolled back and connections released. Structure verification is distinct from the data-behavior tests below.
+## 7. Git closeout checks - 2026-11-09
 
-### Database Behavior Tests
+This task modifies only this progress document. Existing related source/design files are included as saved, without further development. Initial branch main, upstream origin/main; initial index empty. Remote fetch/push target was verified as github.com/jasminemuyuxi/Interface-Mapping-Assistant-3.0 with no credential-bearing URL displayed. Related six standard models and c93a7d125e60 migration must accompany their registration imports; they are not omitted as unrelated dependencies. No Chinese development log is created/edited/staged.
 
-- The execution report records 22 passing cases and exit code 0, using anonymous records only.
-- Successful cases covered Identity generation, default ACTIVE status, timezone-aware timestamp defaults, optional NULL fields, Chinese/Korean Unicode round trips, duplicate names with different customer codes, and explicit INACTIVE status.
-- Actual rejected inserts verified unique, NOT NULL, all four Check constraints, and VARCHAR length limits. SQLSTATE and applicable constraint names were checked: 23505 (unique), 23502 (NOT NULL), 23514 (Check), and 22001 (length).
-- All tests used one outer transaction, with independent SAVEPOINTs for expected failures and no commit. After outer rollback, a new read-only transaction found zero remaining records using exact test identifiers; resources were released.
+Actual offline checks, exit 0:
 
-### ORM updated_at Behavior
+```powershell
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD = '1'
+.\.venv\Scripts\python.exe -B -m pytest -q --capture=sys -p no:cacheprovider tests/test_customer_interface_metadata.py
+.\.venv\Scripts\python.exe -B -m alembic heads
+.\.venv\Scripts\python.exe -B -m alembic history
+```
 
-- A Session bound to a shared-Engine Connection used `join_transaction_mode="create_savepoint"` within an outer transaction.
-- After ORM insertion, flush, and refresh, changing only `remark` caused the captured ORM UPDATE to include `updated_at=now()` automatically. Test code did not explicitly assign `updated_at`; `created_at` remained unchanged.
-- Raw SQL changed only `remark` and did not invoke ORM onupdate. This conclusion combined the actual UPDATE SQL, refreshed values, and the confirmed absence of user-defined triggers. An earlier comparison timestamp was returned as an auxiliary baseline without changing stored timestamps.
-- PostgreSQL `now()` returns the transaction start time. Equal insertion and update timestamps within one transaction were not treated as an update failure or used alone as proof of success.
-- The test exited with code 0. The Session was closed, the outer transaction rolled back, the temporary SQL listener removed, and resources released. A new read-only transaction found zero records for the exact random customer code.
-- Rollback does not restore Identity sequence numbers. Tests consumed sequence values and did not reset the sequence or require consecutive IDs.
+Result: 7 passed in 0.56s; one head 4b8e2f6a91d3, complete three-revision chain. An additional stdin-only guarded offline audit compiled all eight registered model tables/indexes, resolved FKs/configured mappers, parsed Python syntax, generated only incremental customer-interface upgrade/downgrade SQL in memory, and checked scope. db.database/dotenv/driver imports and Engine connections were blocked; audit exit 0. No database experiments were run. Formatting/staged-file review precedes Commit. These checks do not establish actual database behavior or resolve the known Unicode issue. Commit/Push outcome is reported after execution in chat, not assumed here.
 
-### Single-Customer Creation Service
+## 8. Next single execution step and limits
 
-- `services/customer_service.py` implements `create_customer(session, ...)`: validate and normalize all inputs, construct Customer, add/flush, and return the ORM object. Returning does not mean commit succeeded; flush may include other pending Session objects.
-- Customer and country codes are trimmed and only ASCII lowercase letters are converted to uppercase. Unicode names and internal spaces are preserved; optional blank text becomes None. Omitted status is explicitly written as ACTIVE by the service; explicit status values are strictly validated.
-- The service performs no duplicate lookup, creates no Session or SAVEPOINT, and does not commit, roll back, or close the caller's Session. The caller owns transaction completion and recovery after flush failure.
-- Safe exceptions distinguish input errors, duplicate customer codes, and other persistence errors. Duplicate classification requires IntegrityError and all matching structured diagnostics: SQLSTATE 23505, schema public, table customers, constraint uq_customers_customer_code. Missing or different diagnostics are persistence errors.
-- Error messages exclude raw input, SQL, parameters, and connection details. `raise ... from None` suppresses displayed exception chaining; it does not remove the original exception object entirely.
+Subject to separate explicit DDL authorization, perform exactly one isolated candidate-collation experiment: verify validation schema/name ownership; create a dedicated nondeterministic ICU root candidate in one transaction, run the anonymous case/accent/width/normalization/symbol comparison matrix, then roll back all validation objects. No application table/index creation, migrations or business rows. Do not drop/reuse unknown objects. Actual uniqueness/concurrency tests remain later work. The next experiment is pending; stop after this Git closeout.
 
-### Service Offline Checks
-
-- The execution report records 96 passing offline stub checks and exit code 0, covering input normalization and validation, exception classification, import isolation, and Session boundaries.
-- The module did not import `db.database`, dotenv, or Streamlit. Stub checks verified invalid inputs failed before object construction/add/flush and only add/flush were used for valid persistence attempts.
-- These are offline stub results, not evidence of real database writes, real driver diagnostics, or transaction recovery.
-
-### Service Rollback-Only Database Integration
-
-- The execution report records passing integration tests and exit code 0, using the shared Engine Connection, an outer transaction, and `Session(join_transaction_mode="create_savepoint")` with anonymous records only.
-- Actual inserts and refresh verified code normalization, Unicode and internal-space preservation, optional blanks becoming NULL, same-name customers with different codes, explicit INACTIVE, Identity generation, and timezone-aware timestamps.
-- Omitted status produced ACTIVE explicitly assigned by the service; this did not revalidate the database status default.
-- A duplicate normalized code raised DuplicateCustomerCodeError with the fixed safe message. Real driver diagnostics matched 23505 / public / customers / uq_customers_customer_code.
-- Before creating the failure SAVEPOINT, the Session had no pending writes. The caller rolled back that failed SAVEPOINT, not the entire Session transaction; the same Session then inserted another valid customer, and the outer transaction remained active.
-- An input validation failure did not invalidate the Session; a subsequent valid insertion succeeded in the same Session.
-- Temporary monitoring detected zero service calls to commit, rollback, close, begin, or begin_nested; monitoring patches were restored.
-- No commit occurred. After closing the Session and rolling back the outer transaction, a new read-only transaction checked the exact set of five random customer codes and found zero remaining records. The verification transaction was rolled back and resources released.
-- Identity sequence values were consumed and were not reset. This integration round did not rerun every offline input case.
-
-Customer database structure, the reported behavior cases, and rollback-only creation-service integration are verified within the stated scope. Actual commit success/failure handling, concurrent competition, other database faults, and Registry UI remain unverified. Database read/write services as a whole and the overall Mapping Registry are not complete.
-
-### Customer Creation Page and Offline Checks
-
-- `app_pages/mapping_registry.py` now provides the seven-field Create customer form, preserving existing planning text, AI Workspace guidance, and navigation. Inputs are retained after success or failure.
-- Only form submission loads SessionLocal and creates a short-lived Session. The page owns commit, error rollback, and final close; only ordinary result values are retained after commit returns successfully.
-- Safe messages cover validation, duplicate codes, persistence/configuration failures, uncertain commit outcomes, and cleanup failures. A known successful commit remains successful if cleanup fails; no automatic write retry is performed.
-- Prior execution reports record 15 passing page-stub scenarios and passing Streamlit AppTest checks with database substitutes; both scripts exited with code 0. They covered fields/defaults, submit gating, retained inputs, old-result removal, non-writing reruns, error/cleanup paths, and success timing.
-- These checks did not load real database configuration or connect to a database and were not rerun during this documentation/Git task. They are not actual commit or manual UI evidence.
-- Manual UI, real commit, real database error handling, navigation regression, and cross-tab behavior remain unverified for the new page.
-
-## 7. Outstanding Work
-
-- The minimal Customer creation service and its input normalization are implemented, with offline and rollback-only integration verification recorded above. Actual commit success and commit-failure handling remain unverified.
-- The Customer creation page is implemented and offline-checked, but manual UI, real commit, and real database error handling remain unverified. Concurrent competition and other database faults remain unverified. Customer list-query service is not implemented; other Customer operations are outside the completed scope.
-- Finalize subsequent table designs and implement remaining ORM models, interface definitions/relationships, and segment Mapping functionality.
-- Detailed auditing and import logs are deferred.
-- AI Workspace scenarios listed in Section 5 remain pending; deeper improvements are deferred behind Registry work.
-
-## 8. Next Single Execution Step
-
-Start `streamlit_app.py` and manually inspect the seven-field Customer form without clicking Create customer.
-
-This next step must not submit the form or write to the database. It has not been performed as part of this documentation/Git task.
-
-## 9. Operating Rules and Constraints
-
-- Local PoC only; do not introduce cloud deployment.
-- Do not expose credentials or use real customer-sensitive sample data.
-- The user explicitly authorized committing and pushing this development batch on 2026-11-02, superseding the earlier deferral. Future Git publication requires authorization within its task scope.
-- Advance one executable step at a time; inspect current source and explain proposed changes before modification.
-- Preserve existing functionality and keep changes small, modular, and limited to the approved scope.
-- Use English for code comments, docstrings, and technical documentation.
-- Record offline checks, database runtime verification, and user manual verification separately; do not treat configuration presence or historical results as current runtime proof.
-- Obtain explicit approval before destructive database operations.
-- This documentation/Git task updated only `docs/PROJECT_STATE.md` before committing the reviewed development files. It did not read `.env`, connect to a database, rerun tests, install dependencies, create models or revisions, execute migrations, or create tables.
+Keep 3.0 independent from 2.0 and local PoC only. Never expose secrets or use sensitive customer test data. No production/cloud scope, table deletion/clearing/reset or Git force/history rewriting is authorized. Necessary early structural corrections may use later authorized model changes and new incremental migrations, retaining applied history with explicit preservation/backfill/collision/recovery plans. Preserve unrelated work. Technical documentation is English; user explanations are Chinese. Full core design is docs/architecture/CUSTOMER_INTERFACE_DESIGN.md; historical reviews are docs/architecture/PROJECT_STRUCTURE_REVIEW.md and STREAMLIT_PAGE_ARCHITECTURE_REVIEW.md. Existing design documents are not modified by this closeout.

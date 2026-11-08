@@ -6,6 +6,13 @@ from alembic import context
 
 from db.base import Base
 import models.customer  # Register customer tables in the shared metadata.
+import models.customer_interface  # Register customer-interface metadata.
+import models.system  # Register shared registry metadata.
+import models.standard_interface  # Register shared registry metadata.
+import models.standard_interface_version  # Register shared registry metadata.
+import models.standard_mapping_record  # Register shared registry metadata.
+import models.standard_mapping_field  # Register shared registry metadata.
+import models.standard_mapping_rule  # Register shared registry metadata.
 
 
 config = context.config
